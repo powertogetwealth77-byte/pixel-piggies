@@ -1,0 +1,32 @@
+level,world,lesson,colors,queue_visible,pod_limit,new_mechanic,target_flow,difficulty,expected_attempts,reward_hook
+1,Bloom Garden,Tap a matching piggie,2,3,5,Basic matching,2,1,1,First Bloom Coins
+2,Bloom Garden,Read piggie ammo,2,3,5,Ammo exact match,2,1,1,Coral fragment
+3,Bloom Garden,Choose between colors,3,3,5,Color choice,3,1,1,Daily reward preview
+4,Bloom Garden,See leftover ammo,3,4,5,First Flower Pod,3,1,1,Aqua fragment
+5,Bloom Garden,Relaunch a waiting piggie,3,4,5,Pod relaunch,4,2,1,Collection preview
+6,Bloom Garden,Avoid filling pods,3,4,5,Pod capacity warning,4,2,1,Booster preview
+7,Bloom Garden,Plan two moves ahead,3,4,5,Visible future queue,5,2,1,First chest
+8,Bloom Garden,Recover queue order,4,4,5,Piggie Swap tutorial,5,2,1,Free Piggie Swap
+9,Bloom Garden,Build a clean streak,4,4,5,Perfect Flow,6,2,1,Flow coin bonus
+10,Bloom Garden,Combine learned rules,4,5,5,First milestone puzzle,6,3,1,Unlock Coral Piggie
+11,Bloom Garden,Reveal cubes by layer,4,5,5,Layered cubes,6,3,1,World-map chest
+12,Bloom Garden,Hold a future color,4,5,5,Two-layer planning,7,3,1,Sunshine fragment
+13,Bloom Garden,Choose a safe temporary pod,4,5,5,Pod prioritization,7,3,1,Cosmetic trail preview
+14,Bloom Garden,Protect Perfect Flow,4,5,5,Optional flow path,8,3,1,Double-flow reward
+15,Bloom Garden,Use Pod Pop,4,5,5,Pod Pop tutorial,7,3,1,Free Pod Pop
+16,Bloom Garden,Identify a blocked color,5,5,5,Vine lock introduction,8,4,1,Key fragment
+17,Bloom Garden,Unlock before launching,5,5,5,Vine sequence,8,4,1,Collection chest
+18,Bloom Garden,Complete first advanced chain,5,5,5,Layer plus vine,9,4,2,Unlock Gardener Piggie
+19,Bloom Garden,Manage four occupied pods,5,5,5,Near-capacity puzzle,9,4,2,Heart refill preview
+20,Bloom Garden,Master the garden,5,6,5,World finale,10,5,2,Legendary Bloom Burst
+21,Coral Reef Kingdom,Learn stone blockers,4,5,5,Stone blocker,7,3,1,Reef map reveal
+22,Coral Reef Kingdom,Route around stone,4,5,5,Split target groups,7,3,1,Reef fragment
+23,Coral Reef Kingdom,Use delayed color access,5,5,5,Stone plus layers,8,4,1,Aqua trail
+24,Coral Reef Kingdom,Read symbols not color alone,5,5,5,Accessibility symbol test,8,4,1,Pearl fragment
+25,Coral Reef Kingdom,Shuffle a dangerous queue,5,5,5,Bloom Shuffle tutorial,8,4,1,Free Bloom Shuffle
+26,Coral Reef Kingdom,Choose booster-free route,5,6,5,Optional recovery route,9,4,2,Booster chest
+27,Coral Reef Kingdom,Preserve two future colors,6,6,5,Six-color board,9,5,2,Violet fragment
+28,Coral Reef Kingdom,Control a full visible queue,6,6,5,Long planning chain,10,5,2,Collection milestone
+29,Coral Reef Kingdom,Recover from four pods,6,6,5,Expert pod sequence,10,5,2,Rare fragment
+30,Coral Reef Kingdom,Prove complete mastery,6,6,5,Mini boss mosaic,12,6,2,Unlock Reef Piggie
+
