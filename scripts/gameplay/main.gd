@@ -38,6 +38,7 @@ var color_values: Dictionary = {
 func _ready() -> void:
 	_build_interface()
 	_start_level()
+	_show_launch_screen()
 
 
 func _build_interface() -> void:
@@ -84,6 +85,8 @@ func _build_hud(page: VBoxContainer) -> void:
 	profile.custom_minimum_size = Vector2(54, 50)
 	profile.add_theme_font_size_override("font_size", 25)
 	_apply_button_style(profile, PANEL_LIGHT, CORAL, 18)
+	profile.tooltip_text = "Piggie Collection"
+	profile.pressed.connect(_show_collection)
 	hud.add_child(profile)
 
 	var brand := VBoxContainer.new()
@@ -284,16 +287,109 @@ func _create_pixel(color_name: String) -> void:
 
 func _create_piggie_button(color_name: String, ammo: int) -> void:
 	var button := Button.new()
-	button.text = "•ᴥ•\n%s  %d" % [color_name, ammo]
+	button.text = ""
 	button.custom_minimum_size = Vector2(145, 86)
-	button.add_theme_font_size_override("font_size", 15)
-	_apply_button_style(button, color_values[color_name], WHITE, 25)
+	button.icon = load("res://assets/piggies/%s.webp" % color_name.to_lower())
+	button.expand_icon = true
+	button.icon_alignment = HORIZONTAL_ALIGNMENT_CENTER
+	_apply_button_style(button, Color("#F1E7FF"), color_values[color_name], 25)
 	button.add_theme_color_override("font_color", INK)
 	button.add_theme_color_override("font_hover_color", INK)
 	button.add_theme_color_override("font_pressed_color", INK)
 	button.set_meta("used", false)
 	button.pressed.connect(_launch_piggie.bind(color_name, ammo, button))
+
+	var badge := PanelContainer.new()
+	badge.set_anchors_preset(Control.PRESET_BOTTOM_WIDE)
+	badge.offset_left = 8
+	badge.offset_right = -8
+	badge.offset_top = -29
+	badge.offset_bottom = -5
+	badge.mouse_filter = Control.MOUSE_FILTER_IGNORE
+	badge.add_theme_stylebox_override("panel", _panel_style(Color(0.07, 0.02, 0.16, 0.90), color_values[color_name], 11, 2))
+	var badge_label := Label.new()
+	badge_label.text = "%s  •  %d" % [color_name, ammo]
+	badge_label.horizontal_alignment = HORIZONTAL_ALIGNMENT_CENTER
+	badge_label.vertical_alignment = VERTICAL_ALIGNMENT_CENTER
+	badge_label.add_theme_font_size_override("font_size", 11)
+	badge_label.add_theme_color_override("font_color", WHITE)
+	badge_label.mouse_filter = Control.MOUSE_FILTER_IGNORE
+	badge.add_child(badge_label)
+	button.add_child(badge)
 	piggie_row.add_child(button)
+
+
+func _show_launch_screen() -> void:
+	var launch := TextureButton.new()
+	launch.name = "LaunchHero"
+	launch.texture_normal = load("res://assets/brand/launch_hero.webp")
+	launch.ignore_texture_size = true
+	launch.stretch_mode = TextureButton.STRETCH_SCALE
+	launch.set_anchors_and_offsets_preset(Control.PRESET_FULL_RECT)
+	launch.z_index = 100
+	launch.tooltip_text = "Tap to play"
+	launch.pressed.connect(_dismiss_launch.bind(launch))
+	add_child(launch)
+
+
+func _dismiss_launch(launch: TextureButton) -> void:
+	launch.disabled = true
+	var tween := create_tween()
+	tween.set_trans(Tween.TRANS_QUAD)
+	tween.set_ease(Tween.EASE_IN_OUT)
+	tween.tween_property(launch, "modulate", Color(1, 1, 1, 0), 0.28)
+	tween.parallel().tween_property(launch, "scale", Vector2(1.035, 1.035), 0.28)
+	await tween.finished
+	launch.queue_free()
+
+
+func _show_collection() -> void:
+	var overlay := ColorRect.new()
+	overlay.name = "CollectionShowcase"
+	overlay.color = Color(0.025, 0.008, 0.08, 0.97)
+	overlay.set_anchors_and_offsets_preset(Control.PRESET_FULL_RECT)
+	overlay.z_index = 80
+	add_child(overlay)
+
+	var margin := MarginContainer.new()
+	margin.set_anchors_and_offsets_preset(Control.PRESET_FULL_RECT)
+	margin.add_theme_constant_override("margin_left", 16)
+	margin.add_theme_constant_override("margin_right", 16)
+	margin.add_theme_constant_override("margin_top", 22)
+	margin.add_theme_constant_override("margin_bottom", 20)
+	overlay.add_child(margin)
+
+	var stack := VBoxContainer.new()
+	stack.add_theme_constant_override("separation", 12)
+	margin.add_child(stack)
+	var heading := Label.new()
+	heading.text = "PIGGIE COLLECTION  •  LIVE EVENTS"
+	heading.horizontal_alignment = HORIZONTAL_ALIGNMENT_CENTER
+	heading.add_theme_font_size_override("font_size", 20)
+	heading.add_theme_color_override("font_color", WHITE)
+	stack.add_child(heading)
+
+	var cards := HBoxContainer.new()
+	cards.size_flags_vertical = Control.SIZE_EXPAND_FILL
+	cards.alignment = BoxContainer.ALIGNMENT_CENTER
+	cards.add_theme_constant_override("separation", 10)
+	stack.add_child(cards)
+	for path in ["res://assets/brand/collection_preview.webp", "res://assets/brand/twin_bloom_preview.webp"]:
+		var preview := TextureRect.new()
+		preview.texture = load(path)
+		preview.custom_minimum_size = Vector2(238, 0)
+		preview.size_flags_vertical = Control.SIZE_EXPAND_FILL
+		preview.expand_mode = TextureRect.EXPAND_IGNORE_SIZE
+		preview.stretch_mode = TextureRect.STRETCH_KEEP_ASPECT_CENTERED
+		cards.add_child(preview)
+
+	var close := Button.new()
+	close.text = "BACK TO THE GARDEN"
+	close.custom_minimum_size = Vector2(0, 58)
+	close.add_theme_font_size_override("font_size", 16)
+	_apply_button_style(close, CORAL, WHITE, 22)
+	close.pressed.connect(overlay.queue_free)
+	stack.add_child(close)
 
 
 func _launch_piggie(color_name: String, ammo: int, button: Button) -> void:
