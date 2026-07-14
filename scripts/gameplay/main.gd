@@ -1,20 +1,26 @@
 extends Control
 
-const DEEP_VIOLET := Color("#12072E")
-const PANEL_VIOLET := Color("#291653")
-const CORAL := Color("#FF6577")
-const AQUA := Color("#34D9E6")
+const DEEP_VIOLET := Color("#100626")
+const INK := Color("#190B35")
+const PANEL_VIOLET := Color("#26104E")
+const PANEL_LIGHT := Color("#42217B")
+const CORAL := Color("#FF6478")
+const AQUA := Color("#35D7E5")
 const SUNSHINE := Color("#FFC83D")
 const WHITE := Color("#FFF9F2")
-const SOFT_PURPLE := Color("#BFA8FF")
-const SUCCESS_GREEN := Color("#78E85B")
+const SOFT_PURPLE := Color("#CDBBFF")
+const SUCCESS_GREEN := Color("#87F05E")
+const GOLD := Color("#FFD45A")
 
 var board_grid: GridContainer
 var piggie_row: HBoxContainer
 var status_label: Label
 var level_label: Label
-var pixel_cells: Array[ColorRect] = []
+var waiting_row: HBoxContainer
+var combo_badge: Label
+var pixel_cells: Array[PanelContainer] = []
 var is_resolving := false
+var combo := 0
 
 var level_layout: Array[String] = [
 	"CORAL", "AQUA", "SUNSHINE", "CORAL", "AQUA", "SUNSHINE",
@@ -35,130 +41,214 @@ func _ready() -> void:
 
 
 func _build_interface() -> void:
-	var background := ColorRect.new()
-	background.color = DEEP_VIOLET
+	var background := TextureRect.new()
+	background.texture = load("res://assets/ui/bloom_garden_gameplay_bg.webp")
+	background.expand_mode = TextureRect.EXPAND_IGNORE_SIZE
+	background.stretch_mode = TextureRect.STRETCH_KEEP_ASPECT_COVERED
 	background.set_anchors_and_offsets_preset(Control.PRESET_FULL_RECT)
+	background.mouse_filter = Control.MOUSE_FILTER_IGNORE
 	add_child(background)
 
-	var margin := MarginContainer.new()
-	margin.set_anchors_and_offsets_preset(Control.PRESET_FULL_RECT)
-	margin.add_theme_constant_override("margin_left", 28)
-	margin.add_theme_constant_override("margin_right", 28)
-	margin.add_theme_constant_override("margin_top", 26)
-	margin.add_theme_constant_override("margin_bottom", 24)
-	add_child(margin)
+	var veil := ColorRect.new()
+	veil.color = Color(0.035, 0.01, 0.12, 0.34)
+	veil.set_anchors_and_offsets_preset(Control.PRESET_FULL_RECT)
+	veil.mouse_filter = Control.MOUSE_FILTER_IGNORE
+	add_child(veil)
+
+	var safe := MarginContainer.new()
+	safe.set_anchors_and_offsets_preset(Control.PRESET_FULL_RECT)
+	safe.add_theme_constant_override("margin_left", 18)
+	safe.add_theme_constant_override("margin_right", 18)
+	safe.add_theme_constant_override("margin_top", 16)
+	safe.add_theme_constant_override("margin_bottom", 15)
+	add_child(safe)
 
 	var page := VBoxContainer.new()
-	page.add_theme_constant_override("separation", 13)
-	margin.add_child(page)
+	page.add_theme_constant_override("separation", 8)
+	safe.add_child(page)
+
+	_build_hud(page)
+	_build_level_header(page)
+	_build_board(page)
+	_build_flow_zone(page)
+	_build_piggie_queue(page)
+
+
+func _build_hud(page: VBoxContainer) -> void:
+	var hud := HBoxContainer.new()
+	hud.add_theme_constant_override("separation", 8)
+	page.add_child(hud)
+
+	var profile := Button.new()
+	profile.text = "🐷"
+	profile.custom_minimum_size = Vector2(54, 50)
+	profile.add_theme_font_size_override("font_size", 25)
+	_apply_button_style(profile, PANEL_LIGHT, CORAL, 18)
+	hud.add_child(profile)
+
+	var brand := VBoxContainer.new()
+	brand.size_flags_horizontal = Control.SIZE_EXPAND_FILL
+	brand.add_theme_constant_override("separation", -2)
+	hud.add_child(brand)
 
 	var title := Label.new()
 	title.text = "PIXEL PIGGIES"
-	title.horizontal_alignment = HORIZONTAL_ALIGNMENT_CENTER
-	title.add_theme_font_size_override("font_size", 40)
+	title.add_theme_font_size_override("font_size", 28)
 	title.add_theme_color_override("font_color", WHITE)
 	title.add_theme_color_override("font_shadow_color", CORAL)
-	title.add_theme_constant_override("shadow_offset_x", 3)
-	title.add_theme_constant_override("shadow_offset_y", 4)
-	page.add_child(title)
+	title.add_theme_constant_override("shadow_offset_x", 2)
+	title.add_theme_constant_override("shadow_offset_y", 3)
+	brand.add_child(title)
+
+	var garden := Label.new()
+	garden.text = "BLOOM GARDEN"
+	garden.add_theme_font_size_override("font_size", 12)
+	garden.add_theme_color_override("font_color", SOFT_PURPLE)
+	brand.add_child(garden)
+
+	var heart := _make_stat_chip("♥  5", CORAL)
+	hud.add_child(heart)
+	var coins := _make_stat_chip("●  560", GOLD)
+	hud.add_child(coins)
+
+
+func _build_level_header(page: VBoxContainer) -> void:
+	var header := PanelContainer.new()
+	header.add_theme_stylebox_override("panel", _panel_style(Color(0.10, 0.035, 0.24, 0.90), Color(0.62, 0.39, 1.0, 0.72), 18, 2))
+	page.add_child(header)
+
+	var row := HBoxContainer.new()
+	row.add_theme_constant_override("separation", 8)
+	header.add_child(row)
 
 	level_label = Label.new()
-	level_label.text = "BLOOM GARDEN • LEVEL 1"
-	level_label.horizontal_alignment = HORIZONTAL_ALIGNMENT_CENTER
-	level_label.add_theme_font_size_override("font_size", 17)
-	level_label.add_theme_color_override("font_color", SOFT_PURPLE)
-	page.add_child(level_label)
+	level_label.text = "GARDEN 01  •  LEVEL 1"
+	level_label.size_flags_horizontal = Control.SIZE_EXPAND_FILL
+	level_label.add_theme_font_size_override("font_size", 16)
+	level_label.add_theme_color_override("font_color", WHITE)
+	row.add_child(level_label)
 
-	var instructions := Label.new()
-	instructions.text = "Tap a piggie to pop pixels of its own color."
-	instructions.horizontal_alignment = HORIZONTAL_ALIGNMENT_CENTER
-	instructions.autowrap_mode = TextServer.AUTOWRAP_WORD_SMART
-	instructions.add_theme_font_size_override("font_size", 17)
-	instructions.add_theme_color_override("font_color", WHITE)
-	page.add_child(instructions)
+	combo_badge = Label.new()
+	combo_badge.text = "FLOW x1"
+	combo_badge.horizontal_alignment = HORIZONTAL_ALIGNMENT_RIGHT
+	combo_badge.add_theme_font_size_override("font_size", 16)
+	combo_badge.add_theme_color_override("font_color", SUNSHINE)
+	row.add_child(combo_badge)
 
+
+func _build_board(page: VBoxContainer) -> void:
 	var board_panel := PanelContainer.new()
-	board_panel.custom_minimum_size = Vector2(0, 380)
-	var board_style := StyleBoxFlat.new()
-	board_style.bg_color = PANEL_VIOLET
-	board_style.corner_radius_top_left = 32
-	board_style.corner_radius_top_right = 32
-	board_style.corner_radius_bottom_left = 32
-	board_style.corner_radius_bottom_right = 32
-	board_style.border_width_left = 3
-	board_style.border_width_top = 3
-	board_style.border_width_right = 3
-	board_style.border_width_bottom = 3
-	board_style.border_color = Color("#6A4AC9")
-	board_style.content_margin_left = 22
-	board_style.content_margin_right = 22
-	board_style.content_margin_top = 28
-	board_style.content_margin_bottom = 28
-	board_panel.add_theme_stylebox_override("panel", board_style)
+	board_panel.custom_minimum_size = Vector2(0, 350)
+	board_panel.size_flags_vertical = Control.SIZE_EXPAND_FILL
+	board_panel.add_theme_stylebox_override("panel", _panel_style(Color(0.08, 0.025, 0.19, 0.90), Color("#8A5CFF"), 30, 3))
 	page.add_child(board_panel)
 
+	var board_stack := VBoxContainer.new()
+	board_stack.add_theme_constant_override("separation", 9)
+	board_panel.add_child(board_stack)
+
+	var objective := HBoxContainer.new()
+	objective.alignment = BoxContainer.ALIGNMENT_CENTER
+	objective.add_theme_constant_override("separation", 8)
+	board_stack.add_child(objective)
+	for entry in [["● 6", CORAL], ["● 6", AQUA], ["● 6", SUNSHINE]]:
+		var chip := Label.new()
+		chip.text = entry[0]
+		chip.add_theme_font_size_override("font_size", 14)
+		chip.add_theme_color_override("font_color", entry[1])
+		objective.add_child(chip)
+
 	var board_center := CenterContainer.new()
-	board_panel.add_child(board_center)
+	board_center.size_flags_vertical = Control.SIZE_EXPAND_FILL
+	board_stack.add_child(board_center)
 
 	board_grid = GridContainer.new()
 	board_grid.columns = 6
-	board_grid.add_theme_constant_override("h_separation", 7)
-	board_grid.add_theme_constant_override("v_separation", 7)
+	board_grid.add_theme_constant_override("h_separation", 5)
+	board_grid.add_theme_constant_override("v_separation", 5)
 	board_center.add_child(board_grid)
 
 	status_label = Label.new()
-	status_label.text = "THE BLOOM CONVEYOR IS READY"
+	status_label.text = "PICK A PIGGIE • START THE FLOW"
 	status_label.horizontal_alignment = HORIZONTAL_ALIGNMENT_CENTER
-	status_label.add_theme_font_size_override("font_size", 19)
+	status_label.add_theme_font_size_override("font_size", 16)
 	status_label.add_theme_color_override("font_color", AQUA)
-	page.add_child(status_label)
+	board_stack.add_child(status_label)
 
-	var conveyor := ColorRect.new()
-	conveyor.color = Color("#50378A")
-	conveyor.custom_minimum_size = Vector2(0, 12)
-	page.add_child(conveyor)
 
+func _build_flow_zone(page: VBoxContainer) -> void:
+	var flow := PanelContainer.new()
+	flow.custom_minimum_size = Vector2(0, 70)
+	flow.add_theme_stylebox_override("panel", _panel_style(Color(0.08, 0.025, 0.18, 0.94), Color(0.30, 0.85, 0.95, 0.65), 20, 2))
+	page.add_child(flow)
+
+	var stack := VBoxContainer.new()
+	stack.add_theme_constant_override("separation", 4)
+	flow.add_child(stack)
+
+	var flow_label := Label.new()
+	flow_label.text = "✦  BLOOM CONVEYOR  ✦"
+	flow_label.horizontal_alignment = HORIZONTAL_ALIGNMENT_CENTER
+	flow_label.add_theme_font_size_override("font_size", 13)
+	flow_label.add_theme_color_override("font_color", AQUA)
+	stack.add_child(flow_label)
+
+	waiting_row = HBoxContainer.new()
+	waiting_row.alignment = BoxContainer.ALIGNMENT_CENTER
+	waiting_row.add_theme_constant_override("separation", 9)
+	stack.add_child(waiting_row)
+	for index in range(5):
+		var pod := PanelContainer.new()
+		pod.custom_minimum_size = Vector2(55, 32)
+		pod.add_theme_stylebox_override("panel", _panel_style(Color(0.20, 0.10, 0.38, 0.90), Color(0.65, 0.52, 1.0, 0.55), 14, 2))
+		pod.set_meta("occupied", false)
+		waiting_row.add_child(pod)
+
+
+func _build_piggie_queue(page: VBoxContainer) -> void:
 	var queue_title := Label.new()
 	queue_title.text = "CHOOSE YOUR PIXEL PIGGIE"
 	queue_title.horizontal_alignment = HORIZONTAL_ALIGNMENT_CENTER
-	queue_title.add_theme_font_size_override("font_size", 16)
+	queue_title.add_theme_font_size_override("font_size", 14)
 	queue_title.add_theme_color_override("font_color", WHITE)
 	page.add_child(queue_title)
 
 	piggie_row = HBoxContainer.new()
 	piggie_row.alignment = BoxContainer.ALIGNMENT_CENTER
-	piggie_row.add_theme_constant_override("separation", 12)
+	piggie_row.add_theme_constant_override("separation", 8)
 	page.add_child(piggie_row)
 
-	var restart_button := Button.new()
-	restart_button.text = "RESTART LEVEL"
-	restart_button.custom_minimum_size = Vector2(0, 50)
-	restart_button.add_theme_font_size_override("font_size", 17)
-	restart_button.pressed.connect(_start_level)
-	page.add_child(restart_button)
-
-	var footer := Label.new()
-	footer.text = "PROTOTYPE 01 • MATCH • POP • BLOOM"
-	footer.horizontal_alignment = HORIZONTAL_ALIGNMENT_CENTER
-	footer.add_theme_font_size_override("font_size", 13)
-	footer.add_theme_color_override("font_color", SOFT_PURPLE)
+	var footer := HBoxContainer.new()
+	footer.alignment = BoxContainer.ALIGNMENT_CENTER
+	footer.add_theme_constant_override("separation", 8)
 	page.add_child(footer)
+	for data in [["↶", "UNDO"], ["↻", "SHUFFLE"], ["✦", "BOOST"]]:
+		var utility := Button.new()
+		utility.text = "%s  %s" % [data[0], data[1]]
+		utility.custom_minimum_size = Vector2(132, 42)
+		utility.add_theme_font_size_override("font_size", 12)
+		_apply_button_style(utility, PANEL_LIGHT, Color("#7850D8"), 16)
+		footer.add_child(utility)
 
 
 func _start_level() -> void:
 	is_resolving = false
-	status_label.text = "THE BLOOM CONVEYOR IS READY"
+	combo = 0
+	status_label.text = "PICK A PIGGIE • START THE FLOW"
 	status_label.add_theme_color_override("font_color", AQUA)
-	level_label.text = "BLOOM GARDEN • LEVEL 1"
+	level_label.text = "GARDEN 01  •  LEVEL 1"
+	combo_badge.text = "FLOW x1"
 
 	for child in board_grid.get_children():
 		child.queue_free()
-
 	for child in piggie_row.get_children():
 		child.queue_free()
+	for pod in waiting_row.get_children():
+		for content in pod.get_children():
+			content.queue_free()
+		pod.set_meta("occupied", false)
 
 	pixel_cells.clear()
-
 	for color_name in level_layout:
 		_create_pixel(color_name)
 
@@ -168,20 +258,23 @@ func _start_level() -> void:
 
 
 func _create_pixel(color_name: String) -> void:
-	var cell := ColorRect.new()
-	cell.color = color_values[color_name]
-	cell.custom_minimum_size = Vector2(62, 62)
+	var cell := PanelContainer.new()
+	cell.custom_minimum_size = Vector2(51, 51)
 	cell.mouse_filter = Control.MOUSE_FILTER_IGNORE
 	cell.set_meta("pixel_color", color_name)
-	cell.pivot_offset = Vector2(31, 31)
+	cell.pivot_offset = Vector2(25.5, 25.5)
+	var pixel_style := _panel_style(color_values[color_name], color_values[color_name].lightened(0.33), 11, 2)
+	pixel_style.shadow_color = Color(0, 0, 0, 0.38)
+	pixel_style.shadow_size = 5
+	pixel_style.shadow_offset = Vector2(0, 4)
+	cell.add_theme_stylebox_override("panel", pixel_style)
 
 	var shine := Label.new()
 	shine.text = "◆"
-	shine.set_anchors_and_offsets_preset(Control.PRESET_FULL_RECT)
 	shine.horizontal_alignment = HORIZONTAL_ALIGNMENT_CENTER
 	shine.vertical_alignment = VERTICAL_ALIGNMENT_CENTER
-	shine.add_theme_font_size_override("font_size", 18)
-	shine.add_theme_color_override("font_color", Color(1, 1, 1, 0.68))
+	shine.add_theme_font_size_override("font_size", 13)
+	shine.add_theme_color_override("font_color", Color(1, 1, 1, 0.72))
 	shine.mouse_filter = Control.MOUSE_FILTER_IGNORE
 	cell.add_child(shine)
 
@@ -191,34 +284,13 @@ func _create_pixel(color_name: String) -> void:
 
 func _create_piggie_button(color_name: String, ammo: int) -> void:
 	var button := Button.new()
-	button.text = "%s\nAMMO %d" % [color_name, ammo]
-	button.custom_minimum_size = Vector2(142, 96)
-	button.add_theme_font_size_override("font_size", 16)
-
-	var normal_style := StyleBoxFlat.new()
-	normal_style.bg_color = color_values[color_name]
-	normal_style.corner_radius_top_left = 28
-	normal_style.corner_radius_top_right = 28
-	normal_style.corner_radius_bottom_left = 28
-	normal_style.corner_radius_bottom_right = 28
-	normal_style.border_width_left = 3
-	normal_style.border_width_top = 3
-	normal_style.border_width_right = 3
-	normal_style.border_width_bottom = 3
-	normal_style.border_color = WHITE
-	button.add_theme_stylebox_override("normal", normal_style)
-
-	var hover_style: StyleBoxFlat = normal_style.duplicate()
-	hover_style.bg_color = color_values[color_name].lightened(0.15)
-	button.add_theme_stylebox_override("hover", hover_style)
-
-	var pressed_style: StyleBoxFlat = normal_style.duplicate()
-	pressed_style.bg_color = color_values[color_name].darkened(0.12)
-	button.add_theme_stylebox_override("pressed", pressed_style)
-
-	button.add_theme_color_override("font_color", DEEP_VIOLET)
-	button.add_theme_color_override("font_hover_color", DEEP_VIOLET)
-	button.add_theme_color_override("font_pressed_color", DEEP_VIOLET)
+	button.text = "•ᴥ•\n%s  %d" % [color_name, ammo]
+	button.custom_minimum_size = Vector2(145, 86)
+	button.add_theme_font_size_override("font_size", 15)
+	_apply_button_style(button, color_values[color_name], WHITE, 25)
+	button.add_theme_color_override("font_color", INK)
+	button.add_theme_color_override("font_hover_color", INK)
+	button.add_theme_color_override("font_pressed_color", INK)
 	button.set_meta("used", false)
 	button.pressed.connect(_launch_piggie.bind(color_name, ammo, button))
 	piggie_row.add_child(button)
@@ -231,10 +303,10 @@ func _launch_piggie(color_name: String, ammo: int, button: Button) -> void:
 	is_resolving = true
 	button.set_meta("used", true)
 	_set_piggie_buttons_disabled(true)
-	status_label.text = "%s PIGGIE IS BLOOMING!" % color_name
+	status_label.text = "%s PIGGIE IS POPPING!" % color_name
 	status_label.add_theme_color_override("font_color", color_values[color_name])
 
-	var matching_cells: Array[ColorRect] = []
+	var matching_cells: Array[PanelContainer] = []
 	for cell in pixel_cells:
 		if is_instance_valid(cell) and cell.get_meta("pixel_color") == color_name:
 			matching_cells.append(cell)
@@ -244,22 +316,24 @@ func _launch_piggie(color_name: String, ammo: int, button: Button) -> void:
 		var cell := matching_cells[index]
 		if not is_instance_valid(cell):
 			continue
-
 		var tween := create_tween()
 		tween.set_trans(Tween.TRANS_BACK)
 		tween.set_ease(Tween.EASE_IN)
-		tween.tween_property(cell, "scale", Vector2(1.2, 1.2), 0.07)
-		tween.tween_property(cell, "scale", Vector2.ZERO, 0.12)
+		tween.tween_property(cell, "scale", Vector2(1.18, 1.18), 0.055)
+		tween.tween_property(cell, "modulate", Color(1.8, 1.8, 1.8, 1), 0.04)
+		tween.tween_property(cell, "scale", Vector2.ZERO, 0.105)
 		await tween.finished
-
 		pixel_cells.erase(cell)
 		cell.queue_free()
-		await get_tree().create_timer(0.035).timeout
+		await get_tree().create_timer(0.025).timeout
 
+	combo += 1
+	combo_badge.text = "FLOW x%d" % maxi(1, combo)
+	_pulse(combo_badge)
 	if pixel_cells.is_empty():
 		_show_victory()
 	else:
-		status_label.text = "PERFECT HIT! CHOOSE THE NEXT PIGGIE"
+		status_label.text = "PERFECT HIT! KEEP THE FLOW"
 		status_label.add_theme_color_override("font_color", SUCCESS_GREEN)
 		is_resolving = false
 		_set_piggie_buttons_disabled(false)
@@ -268,20 +342,69 @@ func _launch_piggie(color_name: String, ammo: int, button: Button) -> void:
 func _set_piggie_buttons_disabled(disabled_state: bool) -> void:
 	for child in piggie_row.get_children():
 		if child is Button:
-			var already_used := bool(child.get_meta("used"))
-			child.disabled = disabled_state or already_used
+			child.disabled = disabled_state or bool(child.get_meta("used"))
 
 
 func _show_victory() -> void:
 	is_resolving = false
-	status_label.text = "BLOOM BURST! LEVEL COMPLETE!"
+	status_label.text = "BLOOM BURST!  ★★★"
 	status_label.add_theme_color_override("font_color", SUNSHINE)
-	level_label.text = "PERFECT FLOW • 3 STARS"
+	level_label.text = "PERFECT FLOW • LEVEL COMPLETE"
 	_set_piggie_buttons_disabled(true)
+	_pulse(status_label, 1.12, 4)
 
-	status_label.pivot_offset = status_label.size * 0.5
+
+func _make_stat_chip(text_value: String, accent: Color) -> PanelContainer:
+	var chip := PanelContainer.new()
+	chip.custom_minimum_size = Vector2(78, 48)
+	chip.add_theme_stylebox_override("panel", _panel_style(Color(0.08, 0.025, 0.18, 0.92), accent, 18, 2))
+	var label := Label.new()
+	label.text = text_value
+	label.horizontal_alignment = HORIZONTAL_ALIGNMENT_CENTER
+	label.vertical_alignment = VERTICAL_ALIGNMENT_CENTER
+	label.add_theme_font_size_override("font_size", 15)
+	label.add_theme_color_override("font_color", WHITE)
+	chip.add_child(label)
+	return chip
+
+
+func _panel_style(fill: Color, border: Color, radius: int, border_width: int) -> StyleBoxFlat:
+	var style := StyleBoxFlat.new()
+	style.bg_color = fill
+	style.border_color = border
+	style.set_border_width_all(border_width)
+	style.set_corner_radius_all(radius)
+	style.content_margin_left = 12
+	style.content_margin_right = 12
+	style.content_margin_top = 9
+	style.content_margin_bottom = 9
+	return style
+
+
+func _apply_button_style(button: Button, fill: Color, border: Color, radius: int) -> void:
+	var normal := _panel_style(fill, border, radius, 3)
+	normal.shadow_color = Color(0, 0, 0, 0.35)
+	normal.shadow_size = 5
+	normal.shadow_offset = Vector2(0, 4)
+	button.add_theme_stylebox_override("normal", normal)
+	var hover: StyleBoxFlat = normal.duplicate()
+	hover.bg_color = fill.lightened(0.12)
+	button.add_theme_stylebox_override("hover", hover)
+	button.add_theme_stylebox_override("focus", hover)
+	var pressed: StyleBoxFlat = normal.duplicate()
+	pressed.bg_color = fill.darkened(0.10)
+	pressed.shadow_size = 1
+	pressed.shadow_offset = Vector2(0, 1)
+	button.add_theme_stylebox_override("pressed", pressed)
+	var disabled: StyleBoxFlat = normal.duplicate()
+	disabled.bg_color = fill.darkened(0.45)
+	disabled.border_color = border.darkened(0.35)
+	button.add_theme_stylebox_override("disabled", disabled)
+
+
+func _pulse(control: Control, target_scale := 1.08, loops := 2) -> void:
+	control.pivot_offset = control.size * 0.5
 	var tween := create_tween()
-	tween.set_loops(3)
-	tween.tween_property(status_label, "scale", Vector2(1.08, 1.08), 0.12)
-	tween.tween_property(status_label, "scale", Vector2.ONE, 0.12)
-
+	tween.set_loops(loops)
+	tween.tween_property(control, "scale", Vector2(target_scale, target_scale), 0.10)
+	tween.tween_property(control, "scale", Vector2.ONE, 0.10)
