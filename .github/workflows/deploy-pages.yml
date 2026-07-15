@@ -3,6 +3,7 @@ name: Deploy to GitHub Pages
 on:
   push:
     branches:
+      - master
       - claude/slack-session-4ve2jv
   workflow_dispatch:
 
