@@ -32,7 +32,8 @@ export function RescueScreen({ onDone }: Props) {
             type="mochi"
             color="sky"
             size={step >= 1 ? 120 : 80}
-            expression={step >= 1 ? 'wow' : 'idle'}
+            expression={step >= 2 ? 'happy' : step >= 1 ? 'wow' : 'idle'}
+            pose={step >= 2 ? 'dance' : 'breathe'}
             glow={step >= 2}
           />
         </div>

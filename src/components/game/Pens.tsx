@@ -36,8 +36,9 @@ export function Pens({ snap, onSelect }: Props) {
                   <PiggyAvatar
                     type={p.type}
                     color={p.color}
-                    size={44}
-                    expression={selectedPen === slot ? 'happy' : 'idle'}
+                    size={46}
+                    expression={selectedPen === slot ? 'launch' : 'idle'}
+                    pose={selectedPen === slot ? 'anticipate' : 'breathe'}
                     glow={feverActive || selectedPen === slot}
                   />
                   {p.maxAmmo > 1 && <span className="ammo">×{p.ammo}</span>}

@@ -7,6 +7,7 @@ import { PICTURE_CHAR } from '../../data/palette';
 import { Board } from './Board';
 import { Pens } from './Pens';
 import { Stars } from '../ui/Stars';
+import { PiggyAvatar } from '../ui/PiggyAvatar';
 
 interface Props {
   level: LevelDef;
@@ -322,6 +323,9 @@ function ResultDialog({
   return (
     <div className="overlay">
       <div className="dialog">
+        <div className="dialog-piggy">
+          <PiggyAvatar type="mochi" color="coral" size={84} expression="happy" pose="dance" />
+        </div>
         <h2>Level Complete!</h2>
         <Stars value={reward.stars} size={40} animate />
         <div

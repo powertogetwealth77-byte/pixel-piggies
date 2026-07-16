@@ -1,6 +1,8 @@
 import type { SaveData } from '../../save/save';
 import { totalStars } from '../../save/save';
+import { PIGGIES } from '../../data/piggies';
 import { PiggyAvatar } from '../ui/PiggyAvatar';
+import type { ColorId, PiggyType } from '../../engine/types';
 
 interface Props {
   save: SaveData;
@@ -10,19 +12,38 @@ interface Props {
   onSettings: () => void;
 }
 
+const HERO_COLORS: Record<PiggyType, ColorId> = {
+  pip: 'coral',
+  mochi: 'sky',
+  blaze: 'sunny',
+  prism: 'grape',
+};
+
 export function MainMenu({ save, onPlay, onKingdom, onSettings }: Props) {
   const stars = totalStars(save);
   return (
-    <div className="screen">
+    <div className="screen screen--menu">
       <div className="menu-hero">
-        <h1 className="title">Pixel Piggies</h1>
+        <h1 className="title">
+          <span>Pixel</span> <span className="title-accent">Piggies</span>
+        </h1>
         <p className="subtitle">Launch, match &amp; reveal!</p>
-        <div className="menu-piggies">
-          <PiggyAvatar type="pip" color="coral" size={70} expression="happy" />
-          <PiggyAvatar type="mochi" color="sky" size={70} expression="happy" />
-          <PiggyAvatar type="blaze" color="sunny" size={70} expression="happy" />
-          <PiggyAvatar type="prism" color="grape" size={70} expression="happy" />
-        </div>
+      </div>
+
+      <div className="char-cards">
+        {(Object.keys(PIGGIES) as PiggyType[]).map((t, i) => (
+          <div className="char-card" key={t} style={{ animationDelay: `${i * 0.08}s` }}>
+            <PiggyAvatar
+              type={t}
+              color={HERO_COLORS[t]}
+              size={74}
+              expression="happy"
+              pose="breathe"
+            />
+            <b>{PIGGIES[t].name}</b>
+            <small>{PIGGIES[t].power}</small>
+          </div>
+        ))}
       </div>
 
       <div className="how">
