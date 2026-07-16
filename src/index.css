@@ -35,13 +35,37 @@ body,
 body {
   font-family: var(--font);
   color: var(--cream);
-  background: radial-gradient(circle at 20% 10%, var(--bg-2), transparent 55%),
-    radial-gradient(circle at 85% 90%, var(--grape), transparent 45%),
-    linear-gradient(160deg, var(--bg-1), #241a3a 80%);
+  background: radial-gradient(circle at 20% 8%, var(--bg-2), transparent 52%),
+    radial-gradient(circle at 88% 92%, #7a4fd4, transparent 42%),
+    radial-gradient(circle at 70% 20%, rgba(255, 154, 171, 0.28), transparent 34%),
+    linear-gradient(165deg, var(--bg-1), #1d1433 85%);
   background-attachment: fixed;
   overflow: hidden;
   user-select: none;
   -webkit-user-select: none;
+}
+
+/* Slow drifting bokeh dots for depth (skipped in low-effects / reduced-motion) */
+body::before {
+  content: '';
+  position: fixed;
+  inset: -60px;
+  pointer-events: none;
+  z-index: 0;
+  background-image: radial-gradient(circle, rgba(255, 255, 255, 0.09) 0 3px, transparent 4px),
+    radial-gradient(circle, rgba(255, 255, 255, 0.05) 0 5px, transparent 6px);
+  background-size: 210px 190px, 340px 300px;
+  background-position: 20px 40px, 120px 10px;
+  animation: bokeh-drift 60s linear infinite;
+}
+body.low-effects::before,
+body.reduced-motion::before {
+  display: none;
+}
+@keyframes bokeh-drift {
+  to {
+    transform: translateY(-190px);
+  }
 }
 
 #root {
@@ -129,11 +153,17 @@ button {
   flex: 1;
   overflow-y: auto;
   overflow-x: hidden;
-  padding: 18px;
+  padding: calc(18px + env(safe-area-inset-top, 0px)) calc(18px + env(safe-area-inset-right, 0px))
+    calc(18px + env(safe-area-inset-bottom, 0px)) calc(18px + env(safe-area-inset-left, 0px));
   display: flex;
   flex-direction: column;
   gap: 16px;
   animation: fadeIn 0.28s ease;
+  position: relative;
+  z-index: 1;
+}
+.screen--menu {
+  justify-content: space-evenly;
 }
 @keyframes fadeIn {
   from {
@@ -294,6 +324,11 @@ button {
 .level-tile .lock {
   font-size: 1.4rem;
 }
+.level-tile .tile-best {
+  font-size: 0.56rem;
+  opacity: 0.75;
+  font-variant-numeric: tabular-nums;
+}
 
 /* ---------- Game screen ---------- */
 .game {
@@ -341,10 +376,11 @@ button {
 }
 
 .hud {
-  padding: 10px 12px 6px;
+  padding: max(10px, env(safe-area-inset-top, 0px)) 12px 8px;
   display: flex;
   flex-direction: column;
   gap: 8px;
+  background: linear-gradient(180deg, rgba(20, 12, 44, 0.55), rgba(20, 12, 44, 0.18) 75%, transparent);
 }
 .hud-top {
   display: flex;
@@ -522,35 +558,29 @@ button {
 .block {
   position: absolute;
   inset: 0;
-  border-radius: 8px;
-  box-shadow: inset 0 -4px 0 rgba(0, 0, 0, 0.22), inset 0 3px 0 rgba(255, 255, 255, 0.35);
+  border-radius: 22%;
+  background-image: linear-gradient(
+    160deg,
+    rgba(255, 255, 255, 0.42),
+    rgba(255, 255, 255, 0.08) 42%,
+    rgba(0, 0, 0, 0.06) 60%,
+    rgba(0, 0, 0, 0.24)
+  );
+  box-shadow: inset 0 -3px 0 rgba(0, 0, 0, 0.2), inset 0 2px 0 rgba(255, 255, 255, 0.3),
+    0 2px 5px rgba(16, 8, 34, 0.35);
   transition: transform 0.16s ease;
 }
 .block::after {
   content: '';
   position: absolute;
-  top: 14%;
-  left: 16%;
-  width: 26%;
-  height: 26%;
-  background: rgba(255, 255, 255, 0.5);
+  top: 10%;
+  left: 12%;
+  width: 32%;
+  height: 22%;
+  background: rgba(255, 255, 255, 0.55);
   border-radius: 50%;
-}
-.block.clearing {
-  animation: burst 0.3s ease forwards;
-}
-@keyframes burst {
-  0% {
-    transform: scale(1);
-  }
-  40% {
-    transform: scale(1.25);
-    filter: brightness(1.5);
-  }
-  100% {
-    transform: scale(0);
-    opacity: 0;
-  }
+  transform: rotate(-18deg);
+  filter: blur(0.5px);
 }
 
 /* Lane tap columns overlay */
@@ -782,7 +812,8 @@ body.color-symbols .block-symbol {
 
 /* ---------- Pens ---------- */
 .tray {
-  padding: 8px 12px 14px;
+  padding: 8px 12px calc(14px + env(safe-area-inset-bottom, 0px));
+  background: linear-gradient(0deg, rgba(20, 12, 44, 0.5), transparent);
 }
 .tray-label {
   font-size: 0.72rem;
@@ -874,22 +905,25 @@ body.color-symbols .block-symbol {
   position: absolute;
   inset: 0;
   z-index: 100;
-  background: rgba(20, 10, 40, 0.72);
-  backdrop-filter: blur(4px);
+  background: rgba(18, 9, 38, 0.66);
+  backdrop-filter: blur(9px) saturate(1.2);
+  -webkit-backdrop-filter: blur(9px) saturate(1.2);
   display: grid;
   place-items: center;
   padding: 20px;
   animation: fadeIn 0.2s ease;
 }
 .dialog {
-  background: linear-gradient(180deg, #3a2a63, #2a1e47);
-  border: 2px solid rgba(255, 255, 255, 0.16);
+  background: linear-gradient(180deg, rgba(74, 55, 118, 0.92), rgba(42, 30, 71, 0.96));
+  border: 1px solid rgba(255, 255, 255, 0.22);
   border-radius: var(--radius-lg);
   padding: 22px;
   width: 100%;
   max-width: 400px;
+  max-height: 100%;
+  overflow-y: auto;
   text-align: center;
-  box-shadow: var(--shadow);
+  box-shadow: 0 24px 60px rgba(10, 4, 24, 0.6), inset 0 1px 0 rgba(255, 255, 255, 0.25);
   display: flex;
   flex-direction: column;
   gap: 14px;
@@ -934,8 +968,45 @@ body.color-symbols .block-symbol {
     opacity: 0;
   }
 }
+.picture-reveal {
+  position: relative;
+  overflow: hidden;
+}
 .picture-reveal .pr-cell {
   border-radius: 3px;
+  animation: pr-pop 0.4s cubic-bezier(0.34, 1.56, 0.64, 1) backwards;
+}
+/* shine sweep across the finished picture */
+.picture-reveal::after {
+  content: '';
+  position: absolute;
+  inset: -30% -60%;
+  background: linear-gradient(
+    115deg,
+    transparent 42%,
+    rgba(255, 255, 255, 0.35) 50%,
+    transparent 58%
+  );
+  animation: pr-shine 1.6s ease 0.9s both;
+  pointer-events: none;
+}
+@keyframes pr-pop {
+  from {
+    opacity: 0;
+    transform: scale(0.2);
+  }
+  to {
+    opacity: 1;
+    transform: scale(1);
+  }
+}
+@keyframes pr-shine {
+  from {
+    transform: translateX(-55%);
+  }
+  to {
+    transform: translateX(55%);
+  }
 }
 
 .stars {
@@ -1125,5 +1196,66 @@ body.color-symbols .block-symbol {
   .pen {
     width: 66px;
     height: 74px;
+  }
+}
+
+/* ---------- Board themes (unlocked via Kingdom restoration) ---------- */
+.board--sunrise {
+  background: linear-gradient(180deg, rgba(90, 40, 80, 0.55), rgba(35, 18, 52, 0.6));
+  box-shadow: inset 0 0 0 2px rgba(255, 157, 77, 0.45), 0 0 22px rgba(255, 157, 77, 0.25),
+    var(--shadow);
+}
+.board--candy {
+  background: linear-gradient(180deg, rgba(120, 45, 90, 0.5), rgba(60, 20, 55, 0.6));
+  box-shadow: inset 0 0 0 2px rgba(255, 150, 165, 0.5), 0 0 22px rgba(255, 150, 165, 0.28),
+    var(--shadow);
+}
+.board--lagoon {
+  background: linear-gradient(180deg, rgba(20, 70, 100, 0.55), rgba(12, 34, 62, 0.65));
+  box-shadow: inset 0 0 0 2px rgba(75, 184, 240, 0.5), 0 0 22px rgba(75, 184, 240, 0.28),
+    var(--shadow);
+}
+
+/* ---------- Landscape tablet / short-wide layouts ---------- */
+@media (orientation: landscape) and (min-width: 700px) and (max-height: 620px) {
+  .app {
+    max-width: 1024px;
+  }
+  .game {
+    display: grid;
+    grid-template-columns: minmax(0, 1fr) 320px;
+    grid-template-rows: auto minmax(0, 1fr);
+  }
+  .hud {
+    grid-column: 1;
+    grid-row: 1;
+  }
+  .board-area {
+    grid-column: 1;
+    grid-row: 2;
+    padding-bottom: 14px;
+  }
+  .board {
+    max-width: min(64vh, 420px);
+  }
+  .tray {
+    grid-column: 2;
+    grid-row: 1 / 3;
+    align-self: center;
+    background: none;
+  }
+  .pens {
+    flex-wrap: wrap;
+    justify-content: center;
+  }
+}
+
+/* Wide desktop: give menu/level screens breathing room */
+@media (min-width: 900px) and (min-height: 700px) {
+  .app {
+    max-width: 640px;
+  }
+  .board {
+    max-width: 480px;
   }
 }

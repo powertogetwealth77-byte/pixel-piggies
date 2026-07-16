@@ -232,6 +232,7 @@ export function GameScreen({ level, save, onComplete, onExit, onQuit, onRestart,
         launchColor={selectedPiggy?.color ?? 'coral'}
         launchType={selectedPiggy?.type ?? 'pip'}
         fxMode={fxMode}
+        theme={save.settings.theme}
       />
 
       {/* Pens + queue */}
@@ -339,7 +340,12 @@ function ResultDialog({
                 <div
                   key={`${r},${c}`}
                   className="pr-cell"
-                  style={{ width: 14, height: 14, background: color }}
+                  style={{
+                    width: 14,
+                    height: 14,
+                    background: color,
+                    animationDelay: `${(r * row.length + c) * 12}ms`,
+                  }}
                 />
               );
             }),
@@ -347,7 +353,8 @@ function ResultDialog({
         </div>
         <p style={{ fontWeight: 900, margin: 0 }}>You revealed the {level.pictureName}!</p>
         <div className="reward-row">
-          <span>🏆 {reward.score}</span>
+          <span>🏆 {reward.score.toLocaleString()}</span>
+          <span>⚡ {reward.bestCombo}</span>
           <span>🪙 {reward.coins}</span>
           <span>🎨 {reward.pigment}</span>
         </div>

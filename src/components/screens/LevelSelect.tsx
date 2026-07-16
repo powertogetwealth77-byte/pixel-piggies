@@ -50,6 +50,9 @@ export function LevelSelect({ save, onBack, onKingdom, onSelect }: Props) {
                   <span>{lvl.id}</span>
                   <Stars value={prog?.stars ?? 0} size={13} />
                   {lvl.rescue && <small>RESCUE</small>}
+                  {!lvl.rescue && prog?.bestScore ? (
+                    <small className="tile-best">🏆 {prog.bestScore.toLocaleString()}</small>
+                  ) : null}
                 </>
               )}
             </button>

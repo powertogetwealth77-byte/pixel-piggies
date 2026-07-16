@@ -10,6 +10,7 @@ interface Props {
   launchColor: ColorId;
   launchType: PiggyType;
   fxMode: FxMode;
+  theme?: string;
 }
 
 interface Floater {
@@ -30,7 +31,7 @@ interface Flyer {
 let fxId = 1;
 const CONFETTI_COLORS = ['#ff6478', '#ffc83d', '#57d99a', '#4bb8f0', '#9d7bff', '#fff7ef'];
 
-export function Board({ snap, onLaunch, launchColor, launchType, fxMode }: Props) {
+export function Board({ snap, onLaunch, launchColor, launchType, fxMode, theme = 'classic' }: Props) {
   const { board, revealed, width, height, level, feverActive, selectedPen } = snap;
   const [floaters, setFloaters] = useState<Floater[]>([]);
   const [flyer, setFlyer] = useState<Flyer | null>(null);
@@ -210,7 +211,7 @@ export function Board({ snap, onLaunch, launchColor, launchType, fxMode }: Props
     <div className="board-area">
       <div
         ref={boardRef}
-        className={`board ${feverActive ? 'fever' : ''}`}
+        className={`board board--${theme} ${feverActive ? 'fever' : ''}`}
         style={{ gridTemplateColumns: `repeat(${width}, 1fr)`, position: 'relative' }}
       >
         {board.flatMap((row, r) =>
