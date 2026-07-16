@@ -112,6 +112,12 @@ class AudioManager {
     }
   }
 
+  /** Happy piggy squeal (poking a rescued piggy in the Kingdom). */
+  squeal() {
+    this.tone(620, 0.1, 'square', 0.16, 0, 1150);
+    this.tone(880, 0.14, 'triangle', 0.18, 0.07, 1400);
+  }
+
   /** Cascade stage jingle — rises a major third per stage. */
   chain(stage: number) {
     const base = 523 * Math.pow(1.26, Math.min(stage - 2, 6));

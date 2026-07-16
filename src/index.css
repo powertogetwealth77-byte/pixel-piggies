@@ -1079,20 +1079,129 @@ body.color-symbols .block-symbol {
 /* ---------- Kingdom ---------- */
 .kingdom-scene {
   position: relative;
-  height: 190px;
   border-radius: var(--radius);
   overflow: hidden;
-  background: linear-gradient(180deg, #7fc7ff, #b6e3ff 60%, #8ce0b0);
-  border: 2px solid rgba(255, 255, 255, 0.2);
+  border: 2px solid rgba(255, 255, 255, 0.25);
+  box-shadow: var(--shadow);
+  flex-shrink: 0;
 }
-.build {
+.k-svg {
+  display: block;
+  width: 100%;
+  height: auto;
+}
+.k-progress {
   position: absolute;
-  bottom: 18px;
-  transition: filter 0.4s ease, opacity 0.4s ease;
+  top: 8px;
+  left: 12px;
+  font-weight: 900;
+  color: #2b2144;
+  font-size: 0.9rem;
+  text-shadow: 0 1px 0 rgba(255, 255, 255, 0.6);
 }
-.build.broken {
-  filter: grayscale(0.85) brightness(0.7);
-  opacity: 0.7;
+.k-gleam {
+  animation: k-twinkle 1.6s ease-in-out infinite;
+}
+.k-water {
+  animation: k-twinkle 2.2s ease-in-out infinite;
+}
+@keyframes k-twinkle {
+  0%,
+  100% {
+    opacity: 0.55;
+  }
+  50% {
+    opacity: 1;
+  }
+}
+.k-wanderer {
+  position: absolute;
+  bottom: 2px;
+  left: 0;
+  background: none;
+  border: none;
+  padding: 0;
+  cursor: pointer;
+  animation: k-wander 10s ease-in-out infinite alternate;
+}
+.k-wanderer.react {
+  animation-play-state: paused;
+}
+.k-wanderer.react svg {
+  animation: k-hop 0.35s ease 2;
+}
+@keyframes k-wander {
+  0% {
+    transform: translateX(8px);
+  }
+  100% {
+    transform: translateX(min(300px, calc(100vw - 120px)));
+  }
+}
+@keyframes k-hop {
+  50% {
+    transform: translateY(-14px) scale(1.06, 0.94);
+  }
+}
+.k-roster {
+  display: grid;
+  grid-template-columns: repeat(4, 1fr);
+  gap: 8px;
+  text-align: center;
+}
+.k-roster-item {
+  display: grid;
+  justify-items: center;
+  gap: 4px;
+}
+.k-roster-item small {
+  font-size: 0.6rem;
+  font-weight: 700;
+  opacity: 0.85;
+  line-height: 1.2;
+}
+.k-roster-item.locked {
+  opacity: 0.45;
+  filter: grayscale(0.9);
+}
+.theme-row {
+  display: grid;
+  grid-template-columns: repeat(4, 1fr);
+  gap: 10px;
+}
+.theme-chip {
+  background: none;
+  border: none;
+  padding: 0;
+  display: grid;
+  justify-items: center;
+  gap: 5px;
+  cursor: pointer;
+  font-weight: 800;
+}
+.theme-chip small {
+  font-size: 0.68rem;
+  opacity: 0.85;
+}
+.theme-swatch {
+  width: 100%;
+  aspect-ratio: 1.5;
+  border-radius: 12px;
+  border: 2px solid rgba(255, 255, 255, 0.25);
+  display: grid;
+  place-items: center;
+  font-size: 1rem;
+  transition: transform 0.12s ease, border-color 0.15s ease;
+}
+.theme-chip.active .theme-swatch {
+  border-color: var(--sunny);
+  box-shadow: 0 0 12px rgba(255, 200, 61, 0.5);
+}
+.theme-chip.locked {
+  opacity: 0.55;
+}
+.theme-chip:active .theme-swatch {
+  transform: scale(0.94);
 }
 .resto-item {
   display: flex;
