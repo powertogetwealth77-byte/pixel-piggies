@@ -3,6 +3,7 @@ import type {
   GameSnapshot,
   LaunchResult,
   LevelDef,
+  LossReason,
   Piggy,
   QueueEntry,
 } from './types';
@@ -63,6 +64,7 @@ interface InternalState {
   elapsedMs: number;
   blocksTotal: number;
   lastLaunch: LaunchResult | null;
+  lossReason: LossReason | null;
 }
 
 export class GameEngine {
@@ -98,6 +100,7 @@ export class GameEngine {
       elapsedMs: 0,
       blocksTotal: countBlocks(board),
       lastLaunch: null,
+      lossReason: null,
     };
     this.snap = this.build();
   }
@@ -143,6 +146,7 @@ export class GameEngine {
       lastLaunch: s.lastLaunch,
       elapsedMs: s.elapsedMs,
       closeCall: filledPens >= this.level.pens - 1 && s.queue.length > 0,
+      lossReason: s.lossReason,
     };
   }
 
@@ -222,6 +226,7 @@ export class GameEngine {
         if (empty === -1) {
           // Holding pens overflow -> loss.
           s.phase = 'lost';
+          s.lossReason = 'overflow';
           this.emit();
           return;
         }
@@ -245,6 +250,7 @@ export class GameEngine {
     const anyPen = s.pens.some(Boolean);
     if (!anyPen && s.queue.length === 0) {
       s.phase = 'lost';
+      s.lossReason = 'ammo';
     }
   }
 
@@ -328,11 +334,14 @@ export class GameEngine {
         for (const k of this.floodSameColor(impact.row, impact.col)) clearKeys.add(k);
       }
 
-      // Type bonuses (unconditional utility).
+      // Type bonuses.
       if (piggy.type === 'pip') {
-        // Clear the whole lane (straight line).
+        // Drill the lane: pop every block of Pip's own color, however deep.
         for (let r = 0; r < this.height; r++) {
-          for (const c of cols) if (s.board[r][c]) clearKeys.add(`${r},${c}`);
+          for (const c of cols) {
+            const cell = s.board[r][c];
+            if (cell && cell.color === piggy.color) clearKeys.add(`${r},${c}`);
+          }
         }
       } else if (piggy.type === 'mochi') {
         // 3x3 area centered on impact.

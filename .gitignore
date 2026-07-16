@@ -17,3 +17,6 @@ Thumbs.db
 *.bak
 *.swp
 
+
+# E2E artifacts
+scripts/e2e/shots/

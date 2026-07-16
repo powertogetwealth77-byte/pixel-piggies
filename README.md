@@ -19,6 +19,17 @@ npm run preview  # preview the production build
 npm run typecheck
 ```
 
+### Verification
+
+```bash
+npm run verify:levels   # prove all 15 levels are solvable (greedy solver)
+npm run test:e2e        # browser E2E of the core loop (needs `npm run dev` running)
+npm run test:campaign   # bot plays all 15 levels to a win through the real UI
+```
+
+The browser tests use `playwright-core`; if Chromium isn't auto-detected, point
+`CHROMIUM_PATH` at a Chromium/Chrome binary.
+
 ## How to play (5 seconds)
 
 1. **Choose a Piggy** in a holding pen.
@@ -31,7 +42,7 @@ Lose if the holding pens overflow (launch fast!). Win by clearing the board.
 
 ### The four Piggies
 
-- **Pip** — Line Blast: clears an entire lane.
+- **Pip** — Lane Drill: pops every pixel of his color in the lane, however deep.
 - **Mochi** — Area Pop: bursts a 3×3 splash.
 - **Blaze** — Combo Fire: color match that supercharges the combo.
 - **Prism** — Wildcard: matches ANY color, once per level.

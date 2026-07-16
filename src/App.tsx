@@ -22,7 +22,7 @@ export type Screen =
   | { name: 'settings' }
   | { name: 'kingdom' }
   | { name: 'rescue' }
-  | { name: 'game'; levelId: number };
+  | { name: 'game'; levelId: number; runId?: number };
 
 export function App() {
   const [save, setSave] = useState<SaveData>(() => loadSave());
@@ -105,12 +105,17 @@ export function App() {
 
       {screen.name === 'game' && (
         <GameScreen
-          key={screen.levelId}
+          key={`${screen.levelId}:${screen.runId ?? 0}`}
           level={LEVELS.find((l) => l.id === screen.levelId)!}
           save={save}
           onComplete={handleLevelComplete}
           onExit={exitGame}
           onQuit={() => go({ name: 'levels' })}
+          onRestart={() =>
+            setScreen((s) =>
+              s.name === 'game' ? { ...s, runId: (s.runId ?? 0) + 1 } : s,
+            )
+          }
           onToast={showToast}
         />
       )}

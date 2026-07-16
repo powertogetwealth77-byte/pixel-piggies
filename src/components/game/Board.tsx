@@ -137,7 +137,13 @@ export function Board({ snap, onLaunch, launchColor, launchType }: Props) {
         {/* Lane guides */}
         <div className="lane-guides">
           {[0, 1, 2].map((i) => (
-            <div key={i} className={`lane-guide ${selectedPen != null ? 'armed' : ''}`} />
+            <div
+              key={i}
+              className={`lane-guide ${snap.pens.some(Boolean) ? 'ready' : ''} ${
+                selectedPen != null ? 'armed' : ''
+              }`}
+              style={{ color: BLOCK_COLORS[launchColor].base }}
+            />
           ))}
         </div>
 

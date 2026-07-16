@@ -58,6 +58,8 @@ export interface LevelDef {
 
 export type GamePhase = 'ready' | 'playing' | 'paused' | 'won' | 'lost';
 
+export type LossReason = 'overflow' | 'ammo';
+
 /** Transient visual info about the most recent launch, read by the effects layer. */
 export interface LaunchResult {
   id: number;
@@ -97,4 +99,5 @@ export interface GameSnapshot {
   lastLaunch: LaunchResult | null;
   elapsedMs: number;
   closeCall: boolean; // pens nearly full
+  lossReason: LossReason | null;
 }

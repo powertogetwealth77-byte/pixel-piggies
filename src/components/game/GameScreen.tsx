@@ -14,10 +14,11 @@ interface Props {
   onComplete: (reward: LevelReward) => void;
   onExit: (levelId: number) => void;
   onQuit: () => void;
+  onRestart: () => void;
   onToast: (msg: string) => void;
 }
 
-export function GameScreen({ level, onComplete, onExit, onQuit, onToast }: Props) {
+export function GameScreen({ level, onComplete, onExit, onQuit, onRestart, onToast }: Props) {
   const { engine, snapshot: snap } = useEngine(level);
   const [shakeClass, setShakeClass] = useState('');
   const [comboBump, setComboBump] = useState(false);
@@ -28,7 +29,11 @@ export function GameScreen({ level, onComplete, onExit, onQuit, onToast }: Props
   const lastLaunchId = useRef(-1);
   const prevFever = useRef(false);
   const completedRef = useRef(false);
-  const [result, setResult] = useState<null | { won: boolean; reward: LevelReward }>(null);
+  const [result, setResult] = useState<null | {
+    won: boolean;
+    reward: LevelReward;
+    lossReason?: 'overflow' | 'ammo';
+  }>(null);
 
   // Start engine + music.
   useEffect(() => {
@@ -97,9 +102,13 @@ export function GameScreen({ level, onComplete, onExit, onQuit, onToast }: Props
       completedRef.current = true;
       audio.lose();
       vibrate(200);
-      setResult({ won: false, reward: { levelId: level.id, stars: 0, score: snap.score, coins: 0, pigment: 0 } });
+      setResult({
+        won: false,
+        reward: { levelId: level.id, stars: 0, score: snap.score, coins: 0, pigment: 0 },
+        lossReason: snap.lossReason ?? 'ammo',
+      });
     }
-  }, [snap.phase, engine, level, snap.score, onComplete]);
+  }, [snap.phase, engine, level, snap.score, snap.lossReason, onComplete]);
 
   const launch = useCallback(
     (lane: number) => {
@@ -126,17 +135,34 @@ export function GameScreen({ level, onComplete, onExit, onQuit, onToast }: Props
     engine.resume();
     setPaused(false);
   };
+
+  // Desktop keyboard controls: 1-3 launch lanes, Q/W/E/R/T/Y select pens, P/Esc pause.
+  useEffect(() => {
+    const onKey = (e: KeyboardEvent) => {
+      if (result) return;
+      const k = e.key.toLowerCase();
+      if (k === 'p' || k === 'escape') {
+        if (paused) doResume();
+        else doPause();
+        return;
+      }
+      if (paused) return;
+      if (k >= '1' && k <= '3') {
+        launch(Number(k) - 1);
+        return;
+      }
+      const penIdx = ['q', 'w', 'e', 'r', 't', 'y'].indexOf(k);
+      if (penIdx >= 0 && penIdx < snap.pens.length && snap.pens[penIdx]) {
+        audio.select();
+        engine.selectPen(penIdx);
+      }
+    };
+    window.addEventListener('keydown', onKey);
+    return () => window.removeEventListener('keydown', onKey);
+  });
+  // Parent remounts this screen with a fresh key, restarting the level in place.
   const restart = () => {
-    onToast('Restarting…');
-    // Re-mount via key handled by parent; here we simply reload the level.
-    completedRef.current = false;
-    setResult(null);
-    setPaused(false);
-    onExitToRestart();
-  };
-  // Parent supplies a fresh key on level change; to restart we bounce out & in.
-  const onExitToRestart = () => {
-    window.setTimeout(() => onQuit(), 0);
+    onRestart();
   };
 
   const selectedPiggy =
@@ -164,6 +190,9 @@ export function GameScreen({ level, onComplete, onExit, onQuit, onToast }: Props
         </div>
 
         <div className="meters">
+          <div className="score-badge" aria-label="Score">
+            🏆 {snap.score.toLocaleString()}
+          </div>
           <div className={`fever-wrap ${snap.feverActive ? 'active' : ''}`}>
             <div
               className="fever-fill"
@@ -216,6 +245,9 @@ export function GameScreen({ level, onComplete, onExit, onQuit, onToast }: Props
             <button className="btn btn--coral btn--block" onClick={onQuit}>
               ✕ Quit to Levels
             </button>
+            <p style={{ fontSize: '0.72rem', opacity: 0.65, margin: '4px 0 0' }}>
+              Keyboard: 1–3 launch lanes · Q–Y pick pens · P pause
+            </p>
           </div>
         </div>
       )}
@@ -240,7 +272,7 @@ function ResultDialog({
   onRetry,
 }: {
   level: LevelDef;
-  result: { won: boolean; reward: LevelReward };
+  result: { won: boolean; reward: LevelReward; lossReason?: 'overflow' | 'ammo' };
   onNext: () => void;
   onRetry: () => void;
 }) {
@@ -248,12 +280,17 @@ function ResultDialog({
   const width = level.picture[0].length;
 
   if (!won) {
+    const overflow = result.lossReason === 'overflow';
     return (
       <div className="overlay">
         <div className="dialog">
-          <h2>Pens Overflowed!</h2>
+          <h2>{overflow ? 'Pens Overflowed!' : 'Out of Piggies!'}</h2>
           <p className="big">😅</p>
-          <p style={{ fontWeight: 800, margin: 0 }}>So close! Launch faster next time.</p>
+          <p style={{ fontWeight: 800, margin: 0 }}>
+            {overflow
+              ? 'So close! Launch faster next time.'
+              : 'Match colors carefully — every piggy counts!'}
+          </p>
           <button className="btn btn--primary btn--block" onClick={onRetry}>
             ↻ Try Again
           </button>

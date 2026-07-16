@@ -62,7 +62,11 @@ function computeClear(board: Grid, piggy: Piggy, lane: number, width: number, he
   const matched = isWild || cell.color === piggy.color;
   if (matched) for (const k of flood(board, impact.row, impact.col)) keys.add(k);
   if (piggy.type === 'pip') {
-    for (let r = 0; r < height; r++) for (const c of colsForLane(lane, width)) if (board[r][c]) keys.add(`${r},${c}`);
+    for (let r = 0; r < height; r++)
+      for (const c of colsForLane(lane, width)) {
+        const b = board[r][c];
+        if (b && b.color === piggy.color) keys.add(`${r},${c}`);
+      }
   } else if (piggy.type === 'mochi') {
     for (let dr = -1; dr <= 1; dr++)
       for (let dc = -1; dc <= 1; dc++) {

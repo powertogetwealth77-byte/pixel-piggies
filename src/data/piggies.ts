@@ -13,8 +13,8 @@ export const PIGGIES: Record<PiggyType, PiggyDef> = {
   pip: {
     type: 'pip',
     name: 'Pip',
-    power: 'Line Blast',
-    blurb: 'Clears an entire lane in one charge.',
+    power: 'Lane Drill',
+    blurb: 'Drills the lane, popping every pixel of his color.',
     face: 'pip',
   },
   mochi: {

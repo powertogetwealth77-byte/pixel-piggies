@@ -6,6 +6,10 @@ import type { LevelDef } from '../engine/types';
 export function useEngine(level: LevelDef) {
   const engine = useMemo(() => new GameEngine(level), [level]);
   const snapshot = useSyncExternalStore(engine.subscribe, engine.getSnapshot);
+  // Dev-only hook so automated tests can inspect and drive the live engine.
+  if (import.meta.env.DEV) {
+    (window as unknown as { __engine?: GameEngine }).__engine = engine;
+  }
   const rafRef = useRef<number | null>(null);
   const lastRef = useRef<number>(0);
 
