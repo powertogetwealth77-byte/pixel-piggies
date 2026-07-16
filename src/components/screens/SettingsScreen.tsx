@@ -99,27 +99,20 @@ export function SettingsScreen({ save, onBack, onUpdate, onReset, onToast }: Pro
         </div>
       </div>
 
-      <div className="card">
-        <div className="row row--between" style={{ marginBottom: 10 }}>
-          <b>🛠 Developer</b>
-          <button
-            className="btn btn--mint"
-            style={{ padding: '8px 14px', minHeight: 40 }}
-            onClick={runVerify}
-          >
-            Verify levels solvable
-          </button>
-        </div>
-        {reports && (
-          <div className="solve-report">
-            {reports.map((r) => (
-              <div key={r.levelId} className={r.solvable ? 'ok' : 'fail'}>
-                L{r.levelId} {r.solvable ? 'OK  ' : 'FAIL'} {r.name} — {r.note}
-              </div>
-            ))}
-          </div>
-        )}
+      <div className="dev-row">
+        <button className="dev-link" onClick={runVerify}>
+          🛠 Verify all levels are solvable
+        </button>
       </div>
+      {reports && (
+        <div className="solve-report">
+          {reports.map((r) => (
+            <div key={r.levelId} className={r.solvable ? 'ok' : 'fail'}>
+              L{r.levelId} {r.solvable ? 'OK  ' : 'FAIL'} {r.name} — {r.note}
+            </div>
+          ))}
+        </div>
+      )}
 
       <p style={{ textAlign: 'center', opacity: 0.6, fontSize: '0.8rem' }}>
         Pixel Piggies — original game. Art, sound &amp; code made from scratch.

@@ -26,7 +26,15 @@ class AudioManager {
       this.ctx = new Ctx();
       this.master = this.ctx.createGain();
       this.master.gain.value = 0.5;
-      this.master.connect(this.ctx.destination);
+      // Gentle bus compression glues layered SFX + music together.
+      const comp = this.ctx.createDynamicsCompressor();
+      comp.threshold.value = -18;
+      comp.knee.value = 24;
+      comp.ratio.value = 4;
+      comp.attack.value = 0.004;
+      comp.release.value = 0.18;
+      this.master.connect(comp);
+      comp.connect(this.ctx.destination);
     } catch {
       this.ctx = null;
     }
@@ -94,22 +102,34 @@ class AudioManager {
   }
 
   launch() {
-    this.tone(300, 0.18, 'sawtooth', 0.18, 0, 720);
+    this.tone(300, 0.18, 'sawtooth', 0.14, 0, 720);
+    this.noise(0.14, 0.08); // air whoosh under the pitch rise
   }
 
   fizzle() {
     this.tone(180, 0.22, 'sine', 0.2, 0, 90);
   }
 
-  /** Combo pop rising in pitch with combo size. */
+  /** Combo pop rising in pitch with combo size, with a low thump for body. */
   pop(combo: number, big: boolean) {
     const base = 440 + Math.min(combo, 24) * 28;
+    this.tone(110, 0.09, 'sine', 0.22, 0, 55); // body
     this.tone(base, 0.12, 'triangle', 0.26);
     this.tone(base * 1.5, 0.1, 'sine', 0.16, 0.02);
     if (big) {
       this.noise(0.12, 0.18);
       this.tone(base * 2, 0.16, 'square', 0.12, 0.03);
     }
+  }
+
+  /** Combo milestone fanfare — one tier louder & longer each time. */
+  praise(tier: number) {
+    const roots = [659, 784, 1047];
+    const root = roots[Math.min(tier, roots.length - 1)];
+    [1, 1.25, 1.5, 2].forEach((r, i) =>
+      this.tone(root * r, 0.16 + tier * 0.03, 'triangle', 0.2, i * 0.045),
+    );
+    if (tier >= 2) this.noise(0.2, 0.14);
   }
 
   /** Happy piggy squeal (poking a rescued piggy in the Kingdom). */

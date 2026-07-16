@@ -16,10 +16,20 @@ interface Props {
   onExit: (levelId: number) => void;
   onQuit: () => void;
   onRestart: () => void;
+  onKingdom: () => void;
   onToast: (msg: string) => void;
 }
 
-export function GameScreen({ level, save, onComplete, onExit, onQuit, onRestart, onToast }: Props) {
+/** Escalating combo milestone callouts. */
+const PRAISE = [
+  { at: 8, text: 'Great!' },
+  { at: 16, text: 'Amazing!' },
+  { at: 24, text: 'PIGGYLICIOUS!' },
+];
+
+export type PenMood = 'idle' | 'sad' | 'happy' | 'wow';
+
+export function GameScreen({ level, save, onComplete, onExit, onQuit, onRestart, onKingdom, onToast }: Props) {
   const fxMode = save.settings.reducedMotion ? 'off' : save.settings.lowEffects ? 'reduced' : 'full';
   const { engine, snapshot: snap } = useEngine(level);
   const [shakeClass, setShakeClass] = useState('');
@@ -27,6 +37,16 @@ export function GameScreen({ level, save, onComplete, onExit, onQuit, onRestart,
   const [showFeverBanner, setShowFeverBanner] = useState(false);
   const [paused, setPaused] = useState(false);
   const [muted, setMuted] = useState(audio.muted);
+  const [praise, setPraise] = useState<{ text: string; tier: number } | null>(null);
+  const [mood, setMood] = useState<PenMood>('idle');
+  const [leanLane, setLeanLane] = useState<number | null>(null);
+  const moodTimer = useRef(0);
+
+  const setMoodFor = useCallback((m: PenMood, ms: number) => {
+    setMood(m);
+    window.clearTimeout(moodTimer.current);
+    moodTimer.current = window.setTimeout(() => setMood('idle'), ms);
+  }, []);
 
   const lastLaunchId = useRef(-1);
   const prevFever = useRef(false);
@@ -53,9 +73,11 @@ export function GameScreen({ level, save, onComplete, onExit, onQuit, onRestart,
     if (l.fizzle) {
       audio.fizzle();
       vibrate(30);
+      setMoodFor('sad', 800);
       return;
     }
     const big = l.cleared.length >= 5 || l.comboAfter >= 8;
+    if (big) setMoodFor('happy', 700);
     audio.pop(l.comboAfter, big);
     if (l.shake > 0.55) {
       setShakeClass('shake-big');
@@ -76,6 +98,7 @@ export function GameScreen({ level, save, onComplete, onExit, onQuit, onRestart,
     if (!ch || ch.id === lastChainId.current) return;
     lastChainId.current = ch.id;
     audio.chain(ch.stage);
+    setMoodFor('wow', 900);
     vibrate([15, 20, 15 + ch.stage * 8]);
     setShakeClass(ch.stage >= 3 ? 'shake-big' : 'shake');
     window.setTimeout(() => setShakeClass(''), 440);
@@ -88,13 +111,34 @@ export function GameScreen({ level, save, onComplete, onExit, onQuit, onRestart,
     if (snap.feverActive && !prevFever.current) {
       audio.feverStart();
       setShowFeverBanner(true);
+      setMoodFor('wow', 1400);
       vibrate([40, 40, 40, 40]);
       window.setTimeout(() => setShowFeverBanner(false), 1400);
     } else if (!snap.feverActive && prevFever.current) {
       audio.feverEnd();
     }
     prevFever.current = snap.feverActive;
+    // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [snap.feverActive]);
+
+  // Combo milestone praise: fires once per milestone per combo run.
+  const prevCombo = useRef(0);
+  useEffect(() => {
+    const c = snap.combo;
+    if (c > prevCombo.current) {
+      for (let tier = PRAISE.length - 1; tier >= 0; tier--) {
+        const m = PRAISE[tier];
+        if (c >= m.at && prevCombo.current < m.at) {
+          setPraise({ text: m.text, tier });
+          audio.praise(tier);
+          vibrate(20 + tier * 15);
+          window.setTimeout(() => setPraise((p) => (p?.text === m.text ? null : p)), 950);
+          break;
+        }
+      }
+    }
+    prevCombo.current = c;
+  }, [snap.combo]);
 
   // Win / loss resolution.
   useEffect(() => {
@@ -139,6 +183,8 @@ export function GameScreen({ level, save, onComplete, onExit, onQuit, onRestart,
         }
       }
       audio.launch();
+      setLeanLane(lane);
+      window.setTimeout(() => setLeanLane(null), 240);
       engine.launchLane(lane, slot);
     },
     [engine, snap.phase, snap.selectedPen, snap.pens, snap.prismUsed, onToast],
@@ -198,7 +244,7 @@ export function GameScreen({ level, save, onComplete, onExit, onQuit, onRestart,
           <div className="objective">
             {level.name}
             <small>
-              Clear {snap.blocksRemaining} / {snap.blocksTotal} pixels · Reveal the {level.pictureName}
+              {snap.blocksRemaining} pixels left · {level.pictureName}
             </small>
           </div>
           <button className="icon-btn" onClick={toggleMute} aria-label="Toggle sound">
@@ -233,16 +279,33 @@ export function GameScreen({ level, save, onComplete, onExit, onQuit, onRestart,
         launchType={selectedPiggy?.type ?? 'pip'}
         fxMode={fxMode}
         theme={save.settings.theme}
+        leanLane={leanLane}
       />
 
       {/* Pens + queue */}
-      <Pens snap={snap} onSelect={(slot) => { audio.select(); engine.selectPen(slot); }} />
+      <Pens snap={snap} mood={mood} onSelect={(slot) => { audio.select(); engine.selectPen(slot); }} />
 
       {/* Banners */}
       {showFeverBanner && <div className="fever-banner">PIGGY FEVER!</div>}
+      {praise && !showFeverBanner && (
+        <div className={`praise praise--${praise.tier}`}>{praise.text}</div>
+      )}
       {snap.closeCall && snap.phase === 'playing' && !snap.feverActive && (
         <div className="close-call">Pens almost full!</div>
       )}
+
+      {/* First-session coaching (level 1 only, until the first pop) */}
+      {level.id === 1 &&
+        !save.levels[1]?.cleared &&
+        !result &&
+        !paused &&
+        snap.phase === 'playing' &&
+        snap.shotsFired === 0 &&
+        snap.pens.some(Boolean) && (
+          <div className={`coach ${snap.selectedPen == null ? 'coach--pens' : 'coach--board'}`}>
+            {snap.selectedPen == null ? 'Tap a piggy to pick it up!' : 'Now tap a lane with the same color!'}
+          </div>
+        )}
 
       {/* Pause overlay */}
       {paused && !result && (
@@ -276,6 +339,18 @@ export function GameScreen({ level, save, onComplete, onExit, onQuit, onRestart,
         <ResultDialog
           level={level}
           result={result}
+          teaser={
+            result.won && !save.mochiRescued && level.id < 5
+              ? `🐷 Mochi's rescue is ${5 - level.id} level${5 - level.id === 1 ? '' : 's'} away!`
+              : undefined
+          }
+          onKingdom={
+            result.won &&
+            save.pigment >= 20 &&
+            (save.kingdom.house < 100 || save.kingdom.bakery < 100 || save.kingdom.fountain < 100)
+              ? onKingdom
+              : undefined
+          }
           onNext={() => onExit(level.id)}
           onRetry={restart}
         />
@@ -287,11 +362,15 @@ export function GameScreen({ level, save, onComplete, onExit, onQuit, onRestart,
 function ResultDialog({
   level,
   result,
+  teaser,
+  onKingdom,
   onNext,
   onRetry,
 }: {
   level: LevelDef;
   result: { won: boolean; reward: LevelReward; lossReason?: 'overflow' | 'ammo' };
+  teaser?: string;
+  onKingdom?: () => void;
   onNext: () => void;
   onRetry: () => void;
 }) {
@@ -358,9 +437,15 @@ function ResultDialog({
           <span>🪙 {reward.coins}</span>
           <span>🎨 {reward.pigment}</span>
         </div>
+        {teaser && <p className="rescue-teaser">{teaser}</p>}
         <button className="btn btn--primary btn--block" onClick={onNext}>
           Continue →
         </button>
+        {onKingdom && (
+          <button className="btn btn--mint btn--block" onClick={onKingdom}>
+            🏰 Spend Pigment in the Kingdom
+          </button>
+        )}
         <button className="btn btn--ghost btn--block" onClick={onRetry}>
           ↻ Replay
         </button>

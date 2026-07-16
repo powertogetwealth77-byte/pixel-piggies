@@ -11,6 +11,8 @@ interface Props {
   launchType: PiggyType;
   fxMode: FxMode;
   theme?: string;
+  /** Lane being launched into right now — the board leans toward it. */
+  leanLane?: number | null;
 }
 
 interface Floater {
@@ -31,10 +33,19 @@ interface Flyer {
 let fxId = 1;
 const CONFETTI_COLORS = ['#ff6478', '#ffc83d', '#57d99a', '#4bb8f0', '#9d7bff', '#fff7ef'];
 
-export function Board({ snap, onLaunch, launchColor, launchType, fxMode, theme = 'classic' }: Props) {
+export function Board({
+  snap,
+  onLaunch,
+  launchColor,
+  launchType,
+  fxMode,
+  theme = 'classic',
+  leanLane = null,
+}: Props) {
   const { board, revealed, width, height, level, feverActive, selectedPen } = snap;
   const [floaters, setFloaters] = useState<Floater[]>([]);
   const [flyer, setFlyer] = useState<Flyer | null>(null);
+  const [pulse, setPulse] = useState(false);
   const lastLaunchId = useRef(-1);
   const lastChainId = useRef(-1);
   const wonRef = useRef(false);
@@ -166,6 +177,9 @@ export function Board({ snap, onLaunch, launchColor, launchType, fxMode, theme =
     if (!ch || ch.id === lastChainId.current) return;
     lastChainId.current = ch.id;
 
+    setPulse(true);
+    window.setTimeout(() => setPulse(false), 240);
+
     let mid = ch.cleared[0];
     for (const c of ch.cleared) if (c.row < mid.row) mid = c;
     const p0 = cellCenter(mid.row, mid.col);
@@ -207,11 +221,18 @@ export function Board({ snap, onLaunch, launchColor, launchType, fxMode, theme =
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [snap.phase]);
 
+  const leanTransform =
+    leanLane == null
+      ? undefined
+      : leanLane === 1
+      ? 'translateY(3px) scale(0.995)'
+      : `rotate(${leanLane === 0 ? -1.1 : 1.1}deg) translateX(${leanLane === 0 ? -5 : 5}px)`;
+
   return (
-    <div className="board-area">
+    <div className="board-area" style={{ transform: leanTransform }}>
       <div
         ref={boardRef}
-        className={`board board--${theme} ${feverActive ? 'fever' : ''}`}
+        className={`board board--${theme} ${feverActive ? 'fever' : ''} ${pulse ? 'board--pulse' : ''}`}
         style={{ gridTemplateColumns: `repeat(${width}, 1fr)`, position: 'relative' }}
       >
         {board.flatMap((row, r) =>

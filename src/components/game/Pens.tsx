@@ -5,12 +5,14 @@ import { PiggyAvatar } from '../ui/PiggyAvatar';
 
 interface Props {
   snap: GameSnapshot;
+  mood?: 'idle' | 'sad' | 'happy' | 'wow';
   onSelect: (slot: number) => void;
 }
 
-export function Pens({ snap, onSelect }: Props) {
+export function Pens({ snap, mood = 'idle', onSelect }: Props) {
   const { pens, queue, selectedPen, closeCall, feverActive, prismUsed } = snap;
   const filled = pens.filter(Boolean).length;
+  const selected = selectedPen != null ? pens[selectedPen] : null;
 
   return (
     <div className="tray">
@@ -37,7 +39,7 @@ export function Pens({ snap, onSelect }: Props) {
                     type={p.type}
                     color={p.color}
                     size={46}
-                    expression={selectedPen === slot ? 'launch' : 'idle'}
+                    expression={selectedPen === slot ? 'launch' : mood}
                     pose={selectedPen === slot ? 'anticipate' : 'breathe'}
                     glow={feverActive || selectedPen === slot}
                   />
@@ -48,6 +50,12 @@ export function Pens({ snap, onSelect }: Props) {
           );
         })}
       </div>
+
+      {selected && (
+        <div className="pen-tag">
+          {PIGGIES[selected.type].name} · {PIGGIES[selected.type].power}
+        </div>
+      )}
 
       <div className="queue">
         {queue.length === 0 ? (

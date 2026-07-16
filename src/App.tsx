@@ -120,6 +120,7 @@ export function App() {
               s.name === 'game' ? { ...s, runId: (s.runId ?? 0) + 1 } : s,
             )
           }
+          onKingdom={() => go({ name: 'kingdom' })}
           onToast={showToast}
         />
       )}

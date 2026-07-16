@@ -2,7 +2,7 @@ import { useId } from 'react';
 import type { ColorId, PiggyType } from '../../engine/types';
 import { BLOCK_COLORS } from '../../data/palette';
 
-export type PiggyExpression = 'idle' | 'happy' | 'launch' | 'wow';
+export type PiggyExpression = 'idle' | 'happy' | 'launch' | 'wow' | 'sad';
 export type PiggyPose = 'breathe' | 'anticipate' | 'dance' | 'none';
 
 interface Props {
@@ -171,6 +171,12 @@ export function PiggyAvatar({
               <path d="M80 45 L68 48" />
             </g>
           )}
+          {expression === 'sad' && (
+            <g stroke={c.dark} strokeWidth="2.4" strokeLinecap="round">
+              <path d="M40 47 L51 45" />
+              <path d="M80 47 L69 45" />
+            </g>
+          )}
           {expression === 'happy' && (
             <g stroke="#2b2144" strokeWidth="2" fill={c.base}>
               <path d={`M40.5 ${eyeY} a5.5 5.5 0 0 0 11 0 Z`} stroke="none" />
@@ -196,6 +202,8 @@ export function PiggyAvatar({
           </g>
         ) : expression === 'happy' || expression === 'launch' ? (
           <path d="M50 82 q10 10 20 0" fill="none" stroke="#7a2b3a" strokeWidth="2.6" strokeLinecap="round" />
+        ) : expression === 'sad' ? (
+          <path d="M52 86 q8 -7 16 0" fill="none" stroke="#7a2b3a" strokeWidth="2.4" strokeLinecap="round" />
         ) : (
           <path d="M54 83 q6 5 12 0" fill="none" stroke="#7a2b3a" strokeWidth="2.4" strokeLinecap="round" />
         )}
