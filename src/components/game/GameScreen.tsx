@@ -67,6 +67,20 @@ export function GameScreen({ level, onComplete, onExit, onQuit, onRestart, onToa
     window.setTimeout(() => setComboBump(false), 250);
   }, [snap.lastLaunch]);
 
+  // Cascade chain feedback: rising jingle, haptic, shake per stage.
+  const lastChainId = useRef(-1);
+  useEffect(() => {
+    const ch = snap.lastChain;
+    if (!ch || ch.id === lastChainId.current) return;
+    lastChainId.current = ch.id;
+    audio.chain(ch.stage);
+    vibrate([15, 20, 15 + ch.stage * 8]);
+    setShakeClass(ch.stage >= 3 ? 'shake-big' : 'shake');
+    window.setTimeout(() => setShakeClass(''), 440);
+    setComboBump(true);
+    window.setTimeout(() => setComboBump(false), 250);
+  }, [snap.lastChain]);
+
   // Fever start / end feedback.
   useEffect(() => {
     if (snap.feverActive && !prevFever.current) {
@@ -91,6 +105,7 @@ export function GameScreen({ level, onComplete, onExit, onQuit, onRestart, onToa
         levelId: level.id,
         stars,
         score: snap.score,
+        bestCombo: snap.bestCombo,
         coins,
         pigment: level.pigment,
       };
@@ -104,7 +119,7 @@ export function GameScreen({ level, onComplete, onExit, onQuit, onRestart, onToa
       vibrate(200);
       setResult({
         won: false,
-        reward: { levelId: level.id, stars: 0, score: snap.score, coins: 0, pigment: 0 },
+        reward: { levelId: level.id, stars: 0, score: snap.score, bestCombo: snap.bestCombo, coins: 0, pigment: 0 },
         lossReason: snap.lossReason ?? 'ammo',
       });
     }

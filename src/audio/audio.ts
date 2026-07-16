@@ -107,6 +107,14 @@ class AudioManager {
     }
   }
 
+  /** Cascade stage jingle — rises a major third per stage. */
+  chain(stage: number) {
+    const base = 523 * Math.pow(1.26, Math.min(stage - 2, 6));
+    [1, 1.25, 1.5].forEach((ratio, i) => this.tone(base * ratio, 0.14, 'triangle', 0.24, i * 0.05));
+    this.tone(base * 2, 0.2, 'sine', 0.14, 0.16);
+    if (stage >= 4) this.noise(0.14, 0.16);
+  }
+
   feverStart() {
     const notes = [523, 659, 784, 1047];
     notes.forEach((f, i) => this.tone(f, 0.22, 'square', 0.22, i * 0.07));

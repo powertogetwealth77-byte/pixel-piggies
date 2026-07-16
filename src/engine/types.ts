@@ -74,6 +74,21 @@ export interface LaunchResult {
   piggyType: PiggyType;
 }
 
+/**
+ * A cascade stage that fired automatically after a clear: two (or more)
+ * previously separate same-color clusters merged when gravity healed the
+ * board, and the merged cluster popped on its own.
+ */
+export interface ChainEvent {
+  id: number;
+  /** Cascade stage: 2 for the first auto-pop after a launch, then 3, 4… */
+  stage: number;
+  cleared: { row: number; col: number; color: ColorId }[];
+  gained: number;
+  comboAfter: number;
+  multiplier: number;
+}
+
 export interface GameSnapshot {
   phase: GamePhase;
   level: LevelDef;
@@ -97,6 +112,9 @@ export interface GameSnapshot {
   shotsFired: number;
   nextSpawnMs: number;
   lastLaunch: LaunchResult | null;
+  lastChain: ChainEvent | null;
+  /** True while a cascade stage is scheduled (blocks may still auto-pop). */
+  chainPending: boolean;
   elapsedMs: number;
   closeCall: boolean; // pens nearly full
   lossReason: LossReason | null;

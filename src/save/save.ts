@@ -5,6 +5,7 @@ import { LEVEL_COUNT } from '../data/levels';
 export interface LevelProgress {
   stars: number;
   bestScore: number;
+  bestCombo: number;
   cleared: boolean;
 }
 
@@ -75,6 +76,7 @@ export interface LevelReward {
   levelId: number;
   stars: number;
   score: number;
+  bestCombo: number;
   coins: number;
   pigment: number;
 }
@@ -86,7 +88,8 @@ export function applyLevelResult(prev: SaveData, reward: LevelReward): SaveData 
   const firstClear = !existing?.cleared;
   const bestStars = Math.max(existing?.stars ?? 0, reward.stars);
   const bestScore = Math.max(existing?.bestScore ?? 0, reward.score);
-  next.levels[reward.levelId] = { stars: bestStars, bestScore, cleared: true };
+  const bestCombo = Math.max(existing?.bestCombo ?? 0, reward.bestCombo);
+  next.levels[reward.levelId] = { stars: bestStars, bestScore, bestCombo, cleared: true };
 
   next.coins += reward.coins;
   // Pigment only granted on the first clear of a level (progression currency).

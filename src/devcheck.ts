@@ -1,5 +1,7 @@
 import { LEVELS } from './data/levels';
 import { solveAll } from './engine/solver';
+import { GameEngine } from './engine/engine';
+import type { LevelDef } from './engine/types';
 
 // Validate board/picture dimensions.
 let dimOk = true;
@@ -35,3 +37,35 @@ for (const r of reports) {
   if (!r.solvable) allSolvable = false;
 }
 console.log(allSolvable ? 'ALL LEVELS SOLVABLE' : 'SOME LEVELS UNSOLVABLE');
+
+// --- Chain reaction unit check -------------------------------------------
+// Board (top to bottom):   . m .      Clearing the coral L drops the three
+//                          m c m      mints into one row: three previously
+//                          c c c      separate clusters merge and cascade.
+const chainLevel: LevelDef = {
+  id: 999,
+  name: 'chain-test',
+  tagline: '',
+  pictureName: 'test',
+  blocks: ['.m.', 'mcm', 'ccc'],
+  picture: ['...', '...', '...'],
+  pens: 3,
+  spawnMs: 99999,
+  queue: [{ type: 'blaze', color: 'coral' }],
+  starScores: [1, 2, 3],
+  pigment: 0,
+};
+const eng = new GameEngine(chainLevel);
+eng.start();
+eng.launchLane(0, 0);
+let chainOk = false;
+for (let t = 0; t < 20; t++) {
+  eng.tick(100);
+  const s = eng.getSnapshot();
+  if (s.lastChain && s.phase === 'won') {
+    chainOk = s.lastChain.stage === 2 && s.lastChain.cleared.length === 3;
+    break;
+  }
+}
+console.log(chainOk ? 'CHAIN CASCADE OK' : 'CHAIN CASCADE FAILED');
+if (!chainOk || !allSolvable || !dimOk) throw new Error('devcheck failed');

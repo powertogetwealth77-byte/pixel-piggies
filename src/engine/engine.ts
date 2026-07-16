@@ -1,5 +1,6 @@
 import type {
   Block,
+  ChainEvent,
   GameSnapshot,
   LaunchResult,
   LevelDef,
@@ -12,6 +13,8 @@ import { BLOCK_CHAR } from '../data/palette';
 export const LANES = 3;
 export const FEVER_MS = 10000;
 export const COMBO_TIMEOUT_MS = 3500;
+/** Delay between cascade stages so each pop reads as its own beat. */
+export const CHAIN_STAGE_MS = 420;
 
 let uid = 1;
 const nextId = () => uid++;
@@ -65,6 +68,9 @@ interface InternalState {
   blocksTotal: number;
   lastLaunch: LaunchResult | null;
   lossReason: LossReason | null;
+  lastChain: ChainEvent | null;
+  /** Scheduled cascade check: cluster ids per block before the last pop. */
+  pendingChain: { stage: number; delayMs: number; prevClusterOf: Map<number, number> } | null;
 }
 
 export class GameEngine {
@@ -101,6 +107,8 @@ export class GameEngine {
       blocksTotal: countBlocks(board),
       lastLaunch: null,
       lossReason: null,
+      lastChain: null,
+      pendingChain: null,
     };
     this.snap = this.build();
   }
@@ -144,6 +152,8 @@ export class GameEngine {
       shotsFired: s.shotsFired,
       nextSpawnMs: Math.max(0, s.spawnTimer),
       lastLaunch: s.lastLaunch,
+      lastChain: s.lastChain,
+      chainPending: s.pendingChain !== null,
       elapsedMs: s.elapsedMs,
       closeCall: filledPens >= this.level.pens - 1 && s.queue.length > 0,
       lossReason: s.lossReason,
@@ -218,6 +228,12 @@ export class GameEngine {
       }
     }
 
+    // Cascade stages: merged same-color clusters auto-pop on a timer.
+    if (s.pendingChain) {
+      s.pendingChain.delayMs -= dtMs;
+      if (s.pendingChain.delayMs <= 0) this.processChainStage();
+    }
+
     // Spawning (paused during fever for a satisfying breather).
     if (!s.feverActive && s.queue.length > 0) {
       s.spawnTimer -= dtMs;
@@ -247,8 +263,9 @@ export class GameEngine {
       return;
     }
     // Out of ammo: no piggies in pens and nothing left to spawn.
+    // A pending cascade may still clear the rest — never lose mid-chain.
     const anyPen = s.pens.some(Boolean);
-    if (!anyPen && s.queue.length === 0) {
+    if (!anyPen && s.queue.length === 0 && !s.pendingChain) {
       s.phase = 'lost';
       s.lossReason = 'ammo';
     }
@@ -317,6 +334,113 @@ export class GameEngine {
     return out;
   }
 
+  /**
+   * Label every same-color cluster on the board. Returns a map from block id
+   * to cluster id, so merges can be detected after gravity moves blocks.
+   */
+  private labelClusters(): Map<number, number> {
+    const s = this.s;
+    const out = new Map<number, number>();
+    const seen = new Set<string>();
+    let nextCluster = 0;
+    for (let r = 0; r < this.height; r++) {
+      for (let c = 0; c < this.width; c++) {
+        const start = s.board[r][c];
+        if (!start || seen.has(`${r},${c}`)) continue;
+        const cluster = nextCluster++;
+        const stack = [[r, c]];
+        while (stack.length) {
+          const [rr, cc] = stack.pop()!;
+          const key = `${rr},${cc}`;
+          if (seen.has(key)) continue;
+          const cell = s.board[rr]?.[cc];
+          if (!cell || cell.color !== start.color) continue;
+          seen.add(key);
+          out.set(cell.id, cluster);
+          stack.push([rr - 1, cc], [rr + 1, cc], [rr, cc - 1], [rr, cc + 1]);
+        }
+      }
+    }
+    return out;
+  }
+
+  /**
+   * Pop every cluster that was formed by merging two or more previously
+   * separate clusters of the same color. Each firing is one cascade stage
+   * with escalating rewards; another stage is scheduled if anything popped.
+   */
+  private processChainStage() {
+    const s = this.s;
+    const pending = s.pendingChain!;
+    const prev = pending.prevClusterOf;
+    const nowClusters = this.labelClusters();
+
+    // Group current blocks by cluster id.
+    const members = new Map<number, { row: number; col: number; block: Block }[]>();
+    for (let r = 0; r < this.height; r++) {
+      for (let c = 0; c < this.width; c++) {
+        const cell = s.board[r][c];
+        if (!cell) continue;
+        const cid = nowClusters.get(cell.id)!;
+        if (!members.has(cid)) members.set(cid, []);
+        members.get(cid)!.push({ row: r, col: c, block: cell });
+      }
+    }
+
+    const cleared: ChainEvent['cleared'] = [];
+    for (const cells of members.values()) {
+      const prevIds = new Set<number>();
+      for (const { block } of cells) {
+        const pid = prev.get(block.id);
+        if (pid !== undefined) prevIds.add(pid);
+      }
+      if (prevIds.size < 2) continue; // not a merge — leave it to the player
+      for (const { row, col, block } of cells) {
+        cleared.push({ row, col, color: block.color });
+        s.board[row][col] = null;
+        s.revealed[row][col] = true;
+      }
+    }
+
+    if (cleared.length === 0) {
+      s.pendingChain = null;
+      return;
+    }
+
+    // Snapshot clusters before gravity so the NEXT stage can detect merges.
+    const beforeGravity = this.labelClusters();
+    this.applyGravity();
+
+    const stage = pending.stage;
+    s.combo += cleared.length;
+    s.bestCombo = Math.max(s.bestCombo, s.combo);
+    s.comboTimer = COMBO_TIMEOUT_MS;
+    const mult = this.multiplier();
+    const gained = cleared.length * 12 * stage * mult;
+    s.score += gained;
+    if (!s.feverActive) {
+      s.fever = Math.min(100, s.fever + cleared.length * 5 * stage);
+      if (s.fever >= 100) {
+        s.feverActive = true;
+        s.feverMsLeft = FEVER_MS;
+      }
+    }
+
+    s.lastChain = {
+      id: nextId(),
+      stage,
+      cleared,
+      gained,
+      comboAfter: s.combo,
+      multiplier: mult,
+    };
+    s.pendingChain = {
+      stage: stage + 1,
+      delayMs: CHAIN_STAGE_MS,
+      prevClusterOf: beforeGravity,
+    };
+  }
+
   private resolveLaunch(piggy: Piggy, lane: number): LaunchResult {
     const s = this.s;
     const impact = this.impactCell(lane);
@@ -376,6 +500,8 @@ export class GameEngine {
     const cleared: LaunchResult['cleared'] = [];
 
     if (!fizzle) {
+      // Remember the cluster layout so gravity-made merges cascade.
+      const prevClusterOf = this.labelClusters();
       for (const k of clearKeys) {
         const [r, c] = k.split(',').map(Number);
         const cell = s.board[r][c];
@@ -386,6 +512,11 @@ export class GameEngine {
         }
       }
       this.applyGravity();
+      this.s.pendingChain = {
+        stage: 2,
+        delayMs: CHAIN_STAGE_MS,
+        prevClusterOf,
+      };
 
       // Scoring & combo.
       let comboGain = cleared.length;
