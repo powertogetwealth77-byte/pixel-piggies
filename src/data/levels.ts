@@ -23,7 +23,7 @@ export const LEVELS: LevelDef[] = [
       { type: 'blaze', color: 'sunny' },
       { type: 'pip', color: 'coral', count: 2 },
     ],
-    starScores: [200, 500, 900],
+    starScores: [550, 1250, 2000],
     pigment: 12,
   },
   // 2 — two colors, learn matching.
@@ -44,7 +44,7 @@ export const LEVELS: LevelDef[] = [
       { type: 'mochi', color: 'mint' },
       { type: 'mochi', color: 'sunny' },
     ],
-    starScores: [400, 800, 1400],
+    starScores: [600, 1350, 2200],
     pigment: 14,
   },
   // 3 — introduce Mochi area pops.
@@ -64,7 +64,7 @@ export const LEVELS: LevelDef[] = [
       { type: 'pip', color: 'coral' },
       { type: 'pip', color: 'sky' },
     ],
-    starScores: [500, 1000, 1700],
+    starScores: [400, 900, 1450],
     pigment: 16,
   },
   // 4 — Prism wildcard intro.
@@ -88,7 +88,7 @@ export const LEVELS: LevelDef[] = [
       { type: 'mochi', color: 'grape' },
       { type: 'mochi', color: 'sky' },
     ],
-    starScores: [700, 1300, 2100],
+    starScores: [250, 550, 900],
     pigment: 18,
   },
   // 5 — RESCUE MOCHI level.
@@ -110,7 +110,7 @@ export const LEVELS: LevelDef[] = [
       { type: 'mochi', color: 'grape' },
       { type: 'prism', color: 'mint' },
     ],
-    starScores: [900, 1600, 2500],
+    starScores: [850, 1800, 2950],
     pigment: 30,
   },
   // 6 — combo spectacle.
@@ -131,7 +131,7 @@ export const LEVELS: LevelDef[] = [
       { type: 'pip', color: 'sunny' },
       { type: 'mochi', color: 'mint' },
     ],
-    starScores: [1200, 2000, 3000],
+    starScores: [850, 1800, 2900],
     pigment: 20,
   },
   // 7 — thinking level, mixed colors.
@@ -159,7 +159,7 @@ export const LEVELS: LevelDef[] = [
       { type: 'blaze', color: 'sky' },
       { type: 'prism', color: 'sunny' },
     ],
-    starScores: [1400, 2300, 3400],
+    starScores: [450, 1000, 1650],
     pigment: 22,
   },
   // 8 — restoration reward level (bakery).
@@ -180,7 +180,7 @@ export const LEVELS: LevelDef[] = [
       { type: 'mochi', color: 'mint', count: 2 },
       { type: 'prism', color: 'coral' },
     ],
-    starScores: [1700, 2700, 3900],
+    starScores: [1650, 3600, 5800],
     pigment: 34,
   },
   // 9 — faster spawns, fewer pens.
@@ -201,7 +201,7 @@ export const LEVELS: LevelDef[] = [
       { type: 'mochi', color: 'sunny' },
       { type: 'prism', color: 'grape' },
     ],
-    starScores: [1900, 3000, 4300],
+    starScores: [2800, 6050, 9800],
     pigment: 24,
   },
   // 10 — bigger board, more planning.
@@ -223,7 +223,7 @@ export const LEVELS: LevelDef[] = [
       { type: 'mochi', color: 'sky', count: 2 },
       { type: 'prism', color: 'coral' },
     ],
-    starScores: [2200, 3400, 4800],
+    starScores: [2150, 4650, 7550],
     pigment: 26,
   },
   // 11 — restoration (fountain).
@@ -244,7 +244,7 @@ export const LEVELS: LevelDef[] = [
       { type: 'mochi', color: 'sunny', count: 2 },
       { type: 'prism', color: 'sunny' },
     ],
-    starScores: [2500, 3800, 5300],
+    starScores: [2450, 5250, 8500],
     pigment: 36,
   },
   // 12 — the hard level.
@@ -266,7 +266,7 @@ export const LEVELS: LevelDef[] = [
       { type: 'blaze', color: 'grape', count: 2 },
       { type: 'prism', color: 'coral' },
     ],
-    starScores: [2800, 4200, 5800],
+    starScores: [4750, 10300, 16700],
     pigment: 28,
   },
   // 13 — wide board (9), epic picture.
@@ -301,7 +301,7 @@ export const LEVELS: LevelDef[] = [
       { type: 'mochi', color: 'coral', count: 2 },
       { type: 'prism', color: 'sunny' },
     ],
-    starScores: [3000, 4600, 6300],
+    starScores: [3000, 6550, 10550],
     pigment: 30,
   },
   // 14 — combo spectacle on wide board.
@@ -341,7 +341,7 @@ export const LEVELS: LevelDef[] = [
       { type: 'mochi', color: 'coral' },
       { type: 'prism', color: 'coral' },
     ],
-    starScores: [3400, 5000, 6900],
+    starScores: [2500, 5450, 8800],
     pigment: 32,
   },
   // 15 — grand finale.
@@ -383,7 +383,7 @@ export const LEVELS: LevelDef[] = [
       { type: 'mochi', color: 'mint' },
       { type: 'prism', color: 'grape' },
     ],
-    starScores: [3800, 5600, 7600],
+    starScores: [900, 2000, 3200],
     pigment: 40,
   },
 ];

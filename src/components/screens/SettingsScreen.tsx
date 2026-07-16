@@ -16,11 +16,21 @@ export function SettingsScreen({ save, onBack, onUpdate, onReset, onToast }: Pro
   const [confirmReset, setConfirmReset] = useState(false);
   const [reports, setReports] = useState<SolveReport[] | null>(null);
 
-  const toggle = (key: 'muted' | 'reducedMotion') => {
+  type BoolSetting = 'muted' | 'musicOff' | 'hapticsOff' | 'reducedMotion' | 'lowEffects' | 'colorSymbols';
+  const toggle = (key: BoolSetting) => {
     const next = { ...save, settings: { ...save.settings, [key]: !save.settings[key] } };
     onUpdate(next);
     if (key === 'muted') audio.setMuted(next.settings.muted);
   };
+
+  const rows: { key: BoolSetting; label: string; on: boolean; hint?: string }[] = [
+    { key: 'muted', label: '🔊 Sound', on: !save.settings.muted },
+    { key: 'musicOff', label: '🎵 Music', on: !save.settings.musicOff },
+    { key: 'hapticsOff', label: '📳 Haptics', on: !save.settings.hapticsOff },
+    { key: 'reducedMotion', label: '🎬 Reduced motion', on: save.settings.reducedMotion },
+    { key: 'lowEffects', label: '🔋 Low effects mode', on: save.settings.lowEffects, hint: 'Fewer particles & glows for older phones' },
+    { key: 'colorSymbols', label: '♿ Color symbols', on: save.settings.colorSymbols, hint: 'Shape markers on blocks for color-blind play' },
+  ];
 
   const runVerify = () => {
     const r = solveAll(LEVELS);
@@ -40,26 +50,21 @@ export function SettingsScreen({ save, onBack, onUpdate, onReset, onToast }: Pro
       </div>
 
       <div className="card">
-        <div className="settings-row">
-          <span>🔊 Sound</span>
-          <button
-            className={`toggle ${!save.settings.muted ? 'on' : ''}`}
-            onClick={() => toggle('muted')}
-            aria-label="Toggle sound"
-          >
-            <span className="knob" />
-          </button>
-        </div>
-        <div className="settings-row">
-          <span>🎬 Reduced motion</span>
-          <button
-            className={`toggle ${save.settings.reducedMotion ? 'on' : ''}`}
-            onClick={() => toggle('reducedMotion')}
-            aria-label="Toggle reduced motion"
-          >
-            <span className="knob" />
-          </button>
-        </div>
+        {rows.map((r) => (
+          <div className="settings-row" key={r.key}>
+            <span>
+              {r.label}
+              {r.hint && <small className="settings-hint">{r.hint}</small>}
+            </span>
+            <button
+              className={`toggle ${r.on ? 'on' : ''}`}
+              onClick={() => toggle(r.key)}
+              aria-label={`Toggle ${r.label}`}
+            >
+              <span className="knob" />
+            </button>
+          </div>
+        ))}
         <div className="settings-row" style={{ borderBottom: 'none' }}>
           <span>🗑 Reset progress</span>
           {confirmReset ? (

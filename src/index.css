@@ -1222,10 +1222,17 @@ body.color-symbols .block-symbol {
   transition: width 0.5s ease;
 }
 
+.settings-hint {
+  display: block;
+  font-size: 0.68rem;
+  opacity: 0.65;
+  font-weight: 600;
+}
 .settings-row {
   display: flex;
   justify-content: space-between;
   align-items: center;
+  gap: 12px;
   padding: 12px 0;
   border-bottom: 1px solid rgba(255, 255, 255, 0.1);
 }
@@ -1366,5 +1373,13 @@ body.color-symbols .block-symbol {
   }
   .board {
     max-width: 480px;
+  }
+}
+
+/* Tall desktop: gather the menu instead of stretching it */
+@media (min-width: 900px) and (min-height: 700px) {
+  .screen--menu {
+    justify-content: center;
+    gap: 26px;
   }
 }

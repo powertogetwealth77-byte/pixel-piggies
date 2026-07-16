@@ -50,17 +50,25 @@ Lose if the holding pens overflow (launch fast!). Win by clearing the board.
 ## Features
 
 - 15 handcrafted, beatable levels with a gradual difficulty curve
-- Three lanes, five pixel colors, chain reactions & combo multipliers
+- Three lanes, five pixel colors, and **multi-stage chain cascades**: clears
+  that merge two separated same-color clusters auto-pop in escalating stages
 - Piggy Fever meter (10s of intensified play: stronger clears, x2 rewards, glow)
 - Piggy queue + limited holding pens with real-time pressure
-- Stars (1–3), coins, and Pigment currency
+- Stars (1–3) calibrated from bot-play data, coins, Pigment, best score & combo
+- Four original 3D-toy hero piggies (layered SVG: gloss, rim light, blinking,
+  breathing, anticipation, victory dance, squash-and-stretch launch arcs)
+- Canvas FX layer: pixel-fracture shards, impact rings, launch trails, fever
+  sparkles and win confetti, with adaptive density for slower devices
 - First-Piggy rescue sequence (rescue Mochi after Level 5)
-- Piggy Kingdom restoration (House, Bakery, Fountain) spent with Pigment
+- Piggy Kingdom: staged SVG restoration scene, wandering rescued piggies that
+  squeal when poked, and unlockable cosmetic board themes
 - Level selection, unlock progression, and local save (localStorage)
-- Pause, restart, sound toggle, reduced-motion, and reset-progress controls
-- Juicy feedback: squash/stretch piggies, particles, floating scores, screen
-  shake on big hits, rising combo pitches, and haptics (`navigator.vibrate`)
-- Responsive desktop + mobile layout with large touch targets
+- Pause, restart, and settings: sound, music, haptics, reduced motion,
+  low-effects mode, and color-blind block symbols
+- Juicy feedback: floating scores, screen shake, rising combo & chain pitches,
+  haptics (`navigator.vibrate`)
+- Responsive portrait mobile, landscape tablet (side-pen layout), and desktop
+  with safe-area support and large touch targets
 - **Developer tool**: Settings → "Verify levels solvable" runs an automated
   solver over every level and reports the results.
 
