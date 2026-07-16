@@ -1,6 +1,3 @@
-# Godot-generated files
-.godot/
-
 # Node / Vite
 node_modules/
 dist/
@@ -20,3 +17,9 @@ Thumbs.db
 
 # E2E artifacts
 scripts/e2e/shots/
+
+# Never commit environment files or unrelated personal folders
+.env
+.env.*
+*.env
+Desktop/

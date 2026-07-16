@@ -86,5 +86,14 @@ from rendering, so adding a level is just adding an entry.
 
 ## Notes
 
-The repository also contains an earlier Godot prototype (`scenes/`, `scripts/`,
-`assets/`, `project.godot`); the playable game is the Vite web app above.
+An earlier Godot prototype and an unrelated `Desktop/` folder were removed from
+the working tree. Only `assets/` (original brand art) remains alongside the
+Vite web app.
+
+> ⚠️ **Security notice:** an unrelated project containing a `.env` file with
+> Supabase credentials was previously committed to this repository. It has been
+> deleted from the current tree, but **it still exists in git history**. Those
+> Supabase keys must be treated as compromised and **rotated** in the Supabase
+> dashboard. To purge them from history entirely, rewrite history (e.g.
+> `git filter-repo --path Desktop --invert-paths`) and force-push, then have
+> all collaborators re-clone.
