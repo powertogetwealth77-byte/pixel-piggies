@@ -562,6 +562,30 @@ button {
   cursor: pointer;
 }
 
+/* Effects canvas overlay */
+.fx-canvas {
+  position: absolute;
+  inset: 0;
+  pointer-events: none;
+  z-index: 35;
+}
+
+/* Color-blind symbols on blocks (enabled via body.color-symbols) */
+.block {
+  display: grid;
+  place-items: center;
+}
+.block-symbol {
+  display: none;
+  font-size: 0.7em;
+  color: rgba(43, 33, 68, 0.55);
+  text-shadow: 0 1px 0 rgba(255, 255, 255, 0.35);
+  user-select: none;
+}
+body.color-symbols .block-symbol {
+  display: block;
+}
+
 /* Flying piggy */
 .flyer {
   position: absolute;

@@ -9,9 +9,14 @@ class AudioManager {
   private musicTimer: number | null = null;
   private musicStep = 0;
   private musicIntensity = 0; // 0 normal, 1 fever
+  private _musicEnabled = true;
 
   get muted() {
     return this._muted;
+  }
+
+  setMusicEnabled(on: boolean) {
+    this._musicEnabled = on;
   }
 
   private ensure() {
@@ -158,7 +163,7 @@ class AudioManager {
     const stepMs = 260;
     this.musicStep = 0;
     this.musicTimer = window.setInterval(() => {
-      if (this._muted) return;
+      if (this._muted || !this._musicEnabled) return;
       const i = this.musicStep % 8;
       const fever = this.musicIntensity > 0;
       this.tone(bassLine[i] * (fever ? 2 : 1), 0.22, 'triangle', 0.08);
@@ -180,7 +185,14 @@ class AudioManager {
 
 export const audio = new AudioManager();
 
+let hapticsEnabled = true;
+
+export function setHaptics(on: boolean) {
+  hapticsEnabled = on;
+}
+
 export function vibrate(pattern: number | number[]) {
+  if (!hapticsEnabled) return;
   try {
     if ('vibrate' in navigator) navigator.vibrate(pattern);
   } catch {

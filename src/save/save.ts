@@ -15,6 +15,8 @@ export interface KingdomState {
   fountain: number;
 }
 
+export type BoardTheme = 'classic' | 'sunrise' | 'candy' | 'lagoon';
+
 export interface SaveData {
   version: number;
   unlockedLevel: number; // highest unlocked (1-based)
@@ -25,7 +27,12 @@ export interface SaveData {
   mochiRescued: boolean;
   settings: {
     muted: boolean;
+    musicOff: boolean;
+    hapticsOff: boolean;
     reducedMotion: boolean;
+    lowEffects: boolean;
+    colorSymbols: boolean;
+    theme: BoardTheme;
   };
 }
 
@@ -41,7 +48,15 @@ export function defaultSave(): SaveData {
     pigment: 0,
     kingdom: { house: 0, bakery: 0, fountain: 0 },
     mochiRescued: false,
-    settings: { muted: false, reducedMotion: false },
+    settings: {
+      muted: false,
+      musicOff: false,
+      hapticsOff: false,
+      reducedMotion: false,
+      lowEffects: false,
+      colorSymbols: false,
+      theme: 'classic',
+    },
   };
 }
 
@@ -114,6 +129,15 @@ export function restore(prev: SaveData, part: keyof KingdomState, cost: number, 
   next.pigment -= cost;
   next.kingdom[part] = Math.min(100, next.kingdom[part] + amount);
   return next;
+}
+
+/** Board themes unlocked by fully restoring kingdom structures. */
+export function unlockedThemes(data: SaveData): BoardTheme[] {
+  const out: BoardTheme[] = ['classic'];
+  if (data.kingdom.house >= 100) out.push('sunrise');
+  if (data.kingdom.bakery >= 100) out.push('candy');
+  if (data.kingdom.fountain >= 100) out.push('lagoon');
+  return out;
 }
 
 export function totalStars(data: SaveData): number {

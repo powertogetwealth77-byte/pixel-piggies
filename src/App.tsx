@@ -1,6 +1,6 @@
 import { useCallback, useEffect, useRef, useState } from 'react';
 import { LEVELS } from './data/levels';
-import { audio } from './audio/audio';
+import { audio, setHaptics } from './audio/audio';
 import {
   applyLevelResult,
   loadSave,
@@ -30,11 +30,15 @@ export function App() {
   const [toast, setToast] = useState<string | null>(null);
   const pendingRescue = useRef(false);
 
-  // Apply persisted settings to audio + motion.
+  // Apply persisted settings to audio, haptics + motion.
   useEffect(() => {
     audio.setMuted(save.settings.muted);
+    audio.setMusicEnabled(!save.settings.musicOff);
+    setHaptics(!save.settings.hapticsOff);
     document.body.classList.toggle('reduced-motion', save.settings.reducedMotion);
-  }, [save.settings.muted, save.settings.reducedMotion]);
+    document.body.classList.toggle('low-effects', save.settings.lowEffects);
+    document.body.classList.toggle('color-symbols', save.settings.colorSymbols);
+  }, [save.settings]);
 
   const update = useCallback((next: SaveData) => {
     setSave(next);

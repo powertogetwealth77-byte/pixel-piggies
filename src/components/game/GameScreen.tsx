@@ -18,7 +18,8 @@ interface Props {
   onToast: (msg: string) => void;
 }
 
-export function GameScreen({ level, onComplete, onExit, onQuit, onRestart, onToast }: Props) {
+export function GameScreen({ level, save, onComplete, onExit, onQuit, onRestart, onToast }: Props) {
+  const fxMode = save.settings.reducedMotion ? 'off' : save.settings.lowEffects ? 'reduced' : 'full';
   const { engine, snapshot: snap } = useEngine(level);
   const [shakeClass, setShakeClass] = useState('');
   const [comboBump, setComboBump] = useState(false);
@@ -229,6 +230,7 @@ export function GameScreen({ level, onComplete, onExit, onQuit, onRestart, onToa
         onLaunch={launch}
         launchColor={selectedPiggy?.color ?? 'coral'}
         launchType={selectedPiggy?.type ?? 'pip'}
+        fxMode={fxMode}
       />
 
       {/* Pens + queue */}

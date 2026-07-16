@@ -18,6 +18,18 @@ export const BLOCK_CHAR: Record<string, ColorId> = {
   g: 'grape',
 };
 
+/**
+ * Color-blind support: a distinct symbol per block color, shown when the
+ * "color symbols" accessibility setting is enabled.
+ */
+export const COLOR_SYMBOLS: Record<ColorId, string> = {
+  coral: '♥',
+  sunny: '★',
+  mint: '▲',
+  sky: '●',
+  grape: '◆',
+};
+
 /** Extended palette used only for revealed hidden pictures. */
 export const PICTURE_CHAR: Record<string, string> = {
   '.': 'transparent',
