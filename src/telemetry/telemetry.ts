@@ -27,6 +27,18 @@ export interface TelemetryData {
   dailiesCompleted: number;
   rescues: Partial<Record<string, string>>; // hero -> ISO timestamp
   levels: Record<number, LevelStats>;
+  // --- The Glitch Tide ---
+  /** Highest Tide stage reached: 0 none, 1 calm, 2 building, 3 critical. */
+  maxTideStage: number;
+  /** Total Tide points restored by matches/items (proxy for "time restored"). */
+  timeRestored: number;
+  glitchStrikes: number;
+  timeoutLosses: number;
+  feverSaves: number; // Fever ignited while in the Critical stage
+  relaxedRuns: number;
+  itemUses: Partial<Record<string, number>>;
+  coinContinues: number;
+  postLossExits: number;
 }
 
 const KEY = 'pixel-piggies-telemetry-v1';
@@ -45,6 +57,15 @@ function blank(): TelemetryData {
     dailiesCompleted: 0,
     rescues: {},
     levels: {},
+    maxTideStage: 0,
+    timeRestored: 0,
+    glitchStrikes: 0,
+    timeoutLosses: 0,
+    feverSaves: 0,
+    relaxedRuns: 0,
+    itemUses: {},
+    coinContinues: 0,
+    postLossExits: 0,
   };
 }
 
@@ -167,6 +188,55 @@ class Telemetry {
 
   dailyDone() {
     this.data.dailiesCompleted += 1;
+    this.persist();
+  }
+
+  // --- Glitch Tide telemetry (all local) ---
+  tideStage(stage: number) {
+    if (stage > this.data.maxTideStage) {
+      this.data.maxTideStage = stage;
+      this.persist();
+    }
+  }
+
+  timeRestored(points: number) {
+    if (points <= 0) return;
+    this.data.timeRestored += Math.round(points);
+    this.persist();
+  }
+
+  glitchStrike() {
+    this.data.glitchStrikes += 1;
+    this.persist();
+  }
+
+  timeoutLoss() {
+    this.data.timeoutLosses += 1;
+    this.persist();
+  }
+
+  feverSave() {
+    this.data.feverSaves += 1;
+    this.persist();
+  }
+
+  relaxedRun() {
+    this.data.relaxedRuns += 1;
+    this.persist();
+  }
+
+  itemUse(id: string) {
+    this.data.itemUses[id] = (this.data.itemUses[id] ?? 0) + 1;
+    this.persist();
+  }
+
+  coinContinue() {
+    this.data.coinContinues += 1;
+    this.persist();
+  }
+
+  postLossExit() {
+    this.data.postLossExits += 1;
     this.persist();
   }
 

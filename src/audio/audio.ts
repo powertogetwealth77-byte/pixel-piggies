@@ -1,6 +1,33 @@
 // Web Audio synthesis — all sounds generated programmatically (no audio files).
+//
+// The soundtrack is an original adaptive engine with four musical states that
+// crossfade smoothly: Playful (calm), Building, Critical, and Fever. Warm
+// marimba + bubble tones carry the melody; a plucked synth and bass layer fade
+// in as tension rises, and the tempo lifts gently — intensifying without ever
+// becoming harsh. Instrument layer volumes lerp toward per-state targets each
+// step, so transitions are seamless rather than abrupt cuts.
 
 type WaveType = OscillatorType;
+
+export type MusicState = 'playful' | 'building' | 'critical' | 'fever';
+
+interface StateProfile {
+  stepMs: number; // tempo
+  bass: number; // layer target gains
+  marimba: number;
+  pluck: number;
+  sparkle: number;
+  transpose: number; // semitone shift
+}
+
+const MUSIC_PROFILES: Record<MusicState, StateProfile> = {
+  playful: { stepMs: 300, bass: 0.07, marimba: 0.06, pluck: 0.0, sparkle: 0.0, transpose: 0 },
+  building: { stepMs: 268, bass: 0.08, marimba: 0.06, pluck: 0.045, sparkle: 0.0, transpose: 0 },
+  critical: { stepMs: 230, bass: 0.1, marimba: 0.055, pluck: 0.06, sparkle: 0.02, transpose: 0 },
+  fever: { stepMs: 190, bass: 0.09, marimba: 0.07, pluck: 0.05, sparkle: 0.06, transpose: 12 },
+};
+
+const semis = (base: number, s: number) => base * Math.pow(2, s / 12);
 
 class AudioManager {
   private ctx: AudioContext | null = null;
@@ -8,8 +35,10 @@ class AudioManager {
   private _muted = false;
   private musicTimer: number | null = null;
   private musicStep = 0;
-  private musicIntensity = 0; // 0 normal, 1 fever
   private _musicEnabled = true;
+  private musicState: MusicState = 'playful';
+  // Live (lerped) layer gains + tempo for smooth crossfades between states.
+  private live = { stepMs: 300, bass: 0.07, marimba: 0.06, pluck: 0, sparkle: 0, transpose: 0 };
 
   get muted() {
     return this._muted;
@@ -17,6 +46,11 @@ class AudioManager {
 
   setMusicEnabled(on: boolean) {
     this._musicEnabled = on;
+  }
+
+  /** Switch the adaptive music target state (crossfades over a few steps). */
+  setMusicState(state: MusicState) {
+    this.musicState = state;
   }
 
   private ensure() {
@@ -149,12 +183,54 @@ class AudioManager {
   feverStart() {
     const notes = [523, 659, 784, 1047];
     notes.forEach((f, i) => this.tone(f, 0.22, 'square', 0.22, i * 0.07));
-    this.musicIntensity = 1;
+    this.setMusicState('fever');
   }
 
   feverEnd() {
-    this.musicIntensity = 0;
     this.tone(400, 0.3, 'sine', 0.16, 0, 220);
+    // Caller (GameScreen) restores the tide-appropriate state next frame.
+  }
+
+  // --- Glitch Tide SFX --------------------------------------------------
+  /** Soft warning shimmer when the Tide first enters the Critical stage. */
+  tideWarn() {
+    this.tone(370, 0.18, 'triangle', 0.16, 0, 300);
+    this.tone(555, 0.2, 'sine', 0.1, 0.06);
+  }
+
+  /** A Glitch Strike — a detuned wobble, tense but not harsh. */
+  glitchStrike() {
+    this.tone(220, 0.28, 'sawtooth', 0.18, 0, 150);
+    this.tone(233, 0.28, 'sawtooth', 0.14, 0.01, 140); // slight detune = glitch
+    this.noise(0.2, 0.14);
+    this.tone(330, 0.22, 'square', 0.12, 0.12);
+  }
+
+  /** Sparkling reward bell when a match restores Tide time. */
+  timeRestore() {
+    this.tone(1047, 0.12, 'sine', 0.16, 0, 1319);
+    this.tone(1568, 0.14, 'triangle', 0.1, 0.05);
+  }
+
+  /** Freeze Pop / freeze moment — a glassy descending chime. */
+  freeze() {
+    this.tone(1319, 0.24, 'sine', 0.16, 0, 784);
+    this.tone(880, 0.3, 'triangle', 0.1, 0.05, 660);
+  }
+
+  /** Item-use pop with a bright confirm. */
+  item() {
+    this.tone(660, 0.09, 'triangle', 0.2, 0, 990);
+    this.tone(1320, 0.12, 'sine', 0.14, 0.06);
+  }
+
+  /** Powerful final-pixel release — the board is clear. */
+  finalRelease() {
+    const seq = [523, 659, 784, 1047, 1319, 1568];
+    seq.forEach((f, i) => this.tone(f, 0.34, 'triangle', 0.24, i * 0.08));
+    this.tone(131, 0.6, 'sine', 0.2, 0, 262);
+    this.noise(0.5, 0.16);
+    this.tone(2093, 0.5, 'sine', 0.1, 0.4);
   }
 
   spawn() {
@@ -180,32 +256,59 @@ class AudioManager {
     [392, 330, 262, 196].forEach((f, i) => this.tone(f, 0.3, 'sawtooth', 0.2, i * 0.12));
   }
 
-  // --- Background music -------------------------------------------------
+  // --- Adaptive background music ---------------------------------------
   startMusic() {
     if (this.musicTimer != null) return;
     this.ensure();
-    const bassLine = [131, 131, 165, 196, 147, 147, 175, 220];
-    const melody = [523, 659, 587, 784, 698, 659, 587, 494];
-    const stepMs = 260;
+    // A warm, hopeful 8-step loop in a pentatonic-friendly key.
+    const bassLine = [131, 131, 165, 196, 147, 147, 175, 196];
+    const marimba = [523, 659, 587, 784, 698, 659, 587, 494];
+    const pluck = [784, 988, 880, 1047, 988, 880, 784, 659];
     this.musicStep = 0;
-    this.musicTimer = window.setInterval(() => {
-      if (this._muted || !this._musicEnabled) return;
-      const i = this.musicStep % 8;
-      const fever = this.musicIntensity > 0;
-      this.tone(bassLine[i] * (fever ? 2 : 1), 0.22, 'triangle', 0.08);
-      if (i % 2 === 0 || fever) {
-        this.tone(melody[i] * (fever ? 1.5 : 1), 0.18, 'sine', fever ? 0.09 : 0.055);
+    this.musicState = 'playful';
+    this.live = { ...MUSIC_PROFILES.playful };
+
+    const step = () => {
+      const target = MUSIC_PROFILES[this.musicState];
+      // Lerp live params toward the target for a smooth crossfade.
+      const k = 0.28;
+      this.live.stepMs += (target.stepMs - this.live.stepMs) * k;
+      this.live.bass += (target.bass - this.live.bass) * k;
+      this.live.marimba += (target.marimba - this.live.marimba) * k;
+      this.live.pluck += (target.pluck - this.live.pluck) * k;
+      this.live.sparkle += (target.sparkle - this.live.sparkle) * k;
+      this.live.transpose += (target.transpose - this.live.transpose) * k;
+
+      if (!this._muted && this._musicEnabled && this.ctx) {
+        const i = this.musicStep % 8;
+        const tr = this.live.transpose;
+        // Bass foundation.
+        if (this.live.bass > 0.005) this.tone(semis(bassLine[i], tr), 0.24, 'triangle', this.live.bass);
+        // Marimba melody on the strong beats.
+        if (this.live.marimba > 0.005 && (i % 2 === 0 || tr > 6)) {
+          this.tone(semis(marimba[i], tr), 0.2, 'sine', this.live.marimba);
+        }
+        // Plucked synth counter-line as tension builds.
+        if (this.live.pluck > 0.006) {
+          this.tone(semis(pluck[i], tr), 0.12, 'triangle', this.live.pluck, i % 2 ? 0.06 : 0);
+        }
+        // Sparkle bells in Critical/Fever.
+        if (this.live.sparkle > 0.006 && i % 4 === 0) {
+          this.tone(semis(marimba[i] * 2, tr), 0.14, 'sine', this.live.sparkle, 0.03);
+        }
       }
-      if (fever && i % 2 === 0) this.tone(melody[i] * 2, 0.1, 'square', 0.05);
       this.musicStep++;
-    }, stepMs);
+      this.musicTimer = window.setTimeout(step, Math.round(this.live.stepMs));
+    };
+    step();
   }
 
   stopMusic() {
     if (this.musicTimer != null) {
-      clearInterval(this.musicTimer);
+      clearTimeout(this.musicTimer);
       this.musicTimer = null;
     }
+    this.musicState = 'playful';
   }
 }
 

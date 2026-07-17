@@ -154,6 +154,7 @@ export function App() {
             )
           }
           onKingdom={() => go({ name: 'kingdom' })}
+          onUpdateSave={update}
           onToast={showToast}
         />
       )}
@@ -172,6 +173,7 @@ export function App() {
             )
           }
           onKingdom={() => go({ name: 'kingdom' })}
+          onUpdateSave={update}
           onToast={showToast}
         />
       )}

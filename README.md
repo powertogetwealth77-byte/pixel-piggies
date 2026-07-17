@@ -22,9 +22,10 @@ npm run typecheck
 ### Verification
 
 ```bash
-npm run verify:levels   # prove all 15 levels are solvable (greedy solver)
+npm run verify:levels   # solver + chain + daily + Glitch Tide unit checks (deterministic)
 npm run test:e2e        # browser E2E of the core loop (needs `npm run dev` running)
-npm run test:campaign   # bot plays all 15 levels to a win through the real UI
+npm run test:tide       # browser E2E of the Glitch Tide (meter, pause, items, Second Wind)
+npm run test:campaign   # bot beats all 15 levels in Relaxed Mode (deterministic solvability)
 ```
 
 The browser tests use `playwright-core`; if Chromium isn't auto-detected, point

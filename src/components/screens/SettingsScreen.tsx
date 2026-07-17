@@ -1,7 +1,8 @@
 import { useState } from 'react';
 import { audio } from '../../audio/audio';
-import type { SaveData } from '../../save/save';
+import { buyItem, itemAvailable, type SaveData } from '../../save/save';
 import { LEVELS } from '../../data/levels';
+import { ITEMS, ITEM_ORDER } from '../../data/items';
 import { solveAll, type SolveReport } from '../../engine/solver';
 import { telemetry } from '../../telemetry/telemetry';
 
@@ -17,7 +18,7 @@ export function SettingsScreen({ save, onBack, onUpdate, onReset, onToast }: Pro
   const [confirmReset, setConfirmReset] = useState(false);
   const [reports, setReports] = useState<SolveReport[] | null>(null);
 
-  type BoolSetting = 'muted' | 'musicOff' | 'hapticsOff' | 'reducedMotion' | 'lowEffects' | 'colorSymbols';
+  type BoolSetting = 'muted' | 'musicOff' | 'hapticsOff' | 'relaxedMode' | 'reducedMotion' | 'lowEffects' | 'colorSymbols';
   const toggle = (key: BoolSetting) => {
     const next = { ...save, settings: { ...save.settings, [key]: !save.settings[key] } };
     onUpdate(next);
@@ -28,10 +29,23 @@ export function SettingsScreen({ save, onBack, onUpdate, onReset, onToast }: Pro
     { key: 'muted', label: '🔊 Sound', on: !save.settings.muted },
     { key: 'musicOff', label: '🎵 Music', on: !save.settings.musicOff },
     { key: 'hapticsOff', label: '📳 Haptics', on: !save.settings.hapticsOff },
+    { key: 'relaxedMode', label: '🌿 Relaxed Mode', on: save.settings.relaxedMode, hint: 'No Glitch Tide · reduced coin rewards' },
     { key: 'reducedMotion', label: '🎬 Reduced motion', on: save.settings.reducedMotion },
     { key: 'lowEffects', label: '🔋 Low effects mode', on: save.settings.lowEffects, hint: 'Fewer particles & glows for older phones' },
     { key: 'colorSymbols', label: '♿ Color symbols', on: save.settings.colorSymbols, hint: 'Shape markers on blocks for color-blind play' },
   ];
+
+  const buy = (id: (typeof ITEM_ORDER)[number]) => {
+    const next = buyItem(save, id);
+    if (!next) {
+      onToast('Not enough coins');
+      audio.fizzle();
+      return;
+    }
+    onUpdate(next);
+    audio.coin();
+    onToast(`Bought ${ITEMS[id].name}`);
+  };
 
   const runVerify = () => {
     const r = solveAll(LEVELS);
@@ -100,6 +114,43 @@ export function SettingsScreen({ save, onBack, onUpdate, onReset, onToast }: Pro
         </div>
       </div>
 
+      <div className="card">
+        <div className="row row--between" style={{ marginBottom: 10 }}>
+          <b>🛟 Recovery Items</b>
+          <span className="pill">🪙 {save.coins}</span>
+        </div>
+        <p style={{ fontSize: '0.74rem', opacity: 0.7, margin: '0 0 10px' }}>
+          Optional helpers for the Glitch Tide. Every level is beatable without
+          them — free intro uses are yours to try first.
+        </p>
+        <div className="shop-list">
+          {ITEM_ORDER.map((id) => {
+            const def = ITEMS[id];
+            const have = itemAvailable(save, id);
+            return (
+              <div className="shop-item" key={id}>
+                <span className="shop-icon">{def.icon}</span>
+                <div className="shop-text">
+                  <b>{def.name}</b>
+                  <small>{def.effect}</small>
+                </div>
+                <div className="shop-buy">
+                  <span className="shop-have">×{have}</span>
+                  <button
+                    className="btn btn--mint"
+                    style={{ padding: '7px 12px', minHeight: 38, fontSize: '0.82rem' }}
+                    disabled={save.coins < def.price}
+                    onClick={() => buy(id)}
+                  >
+                    🪙 {def.price}
+                  </button>
+                </div>
+              </div>
+            );
+          })}
+        </div>
+      </div>
+
       <PlaytestStats onToast={onToast} />
 
       <div className="dev-row">
@@ -150,6 +201,10 @@ function PlaytestStats({ onToast }: { onToast: (msg: string) => void }) {
         <span>⚡ best combo {t.largestCombo} · 🏰 {t.kingdomVisits} visits</span>
         <span>🐷 {Object.keys(t.rescues).length}/4 rescued · 🎁 {t.dailiesCompleted} dailies</span>
         <span>🎓 tutorial {t.tutorialCompleted ? 'done' : 'not yet'}</span>
+        <span>🌊 max Tide {['none', 'calm', 'building', 'critical'][t.maxTideStage]} · ⚡ {t.glitchStrikes} strikes</span>
+        <span>⏱ {t.timeRestored} restored · 💀 {t.timeoutLosses} timeouts</span>
+        <span>🌬️ {t.feverSaves} fever saves · 🌿 {t.relaxedRuns} relaxed runs</span>
+        <span>🛒 {Object.values(t.itemUses).reduce<number>((a, b) => a + (b ?? 0), 0)} items · 🪙 {t.coinContinues} continues</span>
       </div>
       <div className="row" style={{ marginTop: 10 }}>
         <button

@@ -170,6 +170,9 @@ for (let id = 1; id <= 15; id++) {
       { timeout: 6000 },
     );
   } catch { fail(`level ${id} did not start`); break; }
+  // Relaxed Mode makes the run deterministic (no real-time Glitch Tide), so
+  // this campaign proves every level is solvable/beatable on logic alone.
+  await page.evaluate(() => window.__engine.setRelaxed(true));
   const res = await greedyPlayToWin();
   const snap = await page.evaluate(() => {
     const s = window.__engine.getSnapshot();
@@ -190,6 +193,12 @@ if (save) {
   const cleared = Object.values(save.levels).filter((l) => l.cleared).length;
   if (cleared === 15) ok('all 15 levels cleared and saved'); else fail(`only ${cleared}/15 levels saved as cleared`);
   if (save.mochiRescued) ok('Mochi rescue recorded'); else fail('Mochi rescue not recorded');
+  // Purchases are never required: the whole campaign was beaten without buying
+  // or using a single recovery item, and no free item uses were spent.
+  const boughtAny = Object.values(save.items ?? {}).some((n) => n > 0);
+  const usedAny = Object.values(save.freeUsed ?? {}).some((n) => n > 0);
+  if (!boughtAny && !usedAny) ok('purchases never required (0 items bought/used across the campaign)');
+  else fail(`items were used to win: items=${JSON.stringify(save.items)} freeUsed=${JSON.stringify(save.freeUsed)}`);
   console.log(`pigment=${save.pigment} coins=${save.coins}`);
   // Kingdom restoration spend
   await page.getByRole('button', { name: /kingdom/i }).click({ timeout: 5000 }).catch(() => {});

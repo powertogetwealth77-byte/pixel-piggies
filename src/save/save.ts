@@ -2,7 +2,8 @@
 
 import { LEVELS, LEVEL_COUNT } from '../data/levels';
 import { RESCUE_ARCS } from '../data/piggies';
-import type { PiggyType } from '../engine/types';
+import { ITEMS } from '../data/items';
+import type { ItemId, PiggyType } from '../engine/types';
 
 export interface LevelProgress {
   stars: number;
@@ -32,6 +33,10 @@ export interface SaveData {
   rescued: Partial<Record<PiggyType, boolean>>;
   /** Daily bonus board state: last completed date (YYYY-MM-DD). */
   dailyDone: string | null;
+  /** Owned counts of recovery items bought with coins (free uses tracked separately). */
+  items: Partial<Record<ItemId, number>>;
+  /** How many free introductory uses of each item have been spent. */
+  freeUsed: Partial<Record<ItemId, number>>;
   settings: {
     muted: boolean;
     musicOff: boolean;
@@ -39,6 +44,7 @@ export interface SaveData {
     reducedMotion: boolean;
     lowEffects: boolean;
     colorSymbols: boolean;
+    relaxedMode: boolean;
     theme: BoardTheme;
   };
 }
@@ -57,6 +63,8 @@ export function defaultSave(): SaveData {
     mochiRescued: false,
     rescued: {},
     dailyDone: null,
+    items: {},
+    freeUsed: {},
     settings: {
       muted: false,
       musicOff: false,
@@ -64,8 +72,44 @@ export function defaultSave(): SaveData {
       reducedMotion: false,
       lowEffects: false,
       colorSymbols: false,
+      relaxedMode: false,
       theme: 'classic',
     },
+  };
+}
+
+/** Remaining free introductory uses of an item. */
+export function freeUsesLeft(save: SaveData, id: ItemId): number {
+  return Math.max(0, ITEMS[id].freeUses - (save.freeUsed[id] ?? 0));
+}
+
+/** Total available uses right now: remaining free uses + coin-bought stock. */
+export function itemAvailable(save: SaveData, id: ItemId): number {
+  return freeUsesLeft(save, id) + (save.items[id] ?? 0);
+}
+
+/**
+ * Consume one use of an item, spending a free use first, then owned stock.
+ * Returns the updated save, or null if none are available.
+ */
+export function useItem(save: SaveData, id: ItemId): SaveData | null {
+  if (freeUsesLeft(save, id) > 0) {
+    return { ...save, freeUsed: { ...save.freeUsed, [id]: (save.freeUsed[id] ?? 0) + 1 } };
+  }
+  if ((save.items[id] ?? 0) > 0) {
+    return { ...save, items: { ...save.items, [id]: (save.items[id] ?? 0) - 1 } };
+  }
+  return null;
+}
+
+/** Buy one item with coins. Returns updated save, or null if unaffordable. */
+export function buyItem(save: SaveData, id: ItemId): SaveData | null {
+  const price = ITEMS[id].price;
+  if (save.coins < price) return null;
+  return {
+    ...save,
+    coins: save.coins - price,
+    items: { ...save.items, [id]: (save.items[id] ?? 0) + 1 },
   };
 }
 
@@ -80,6 +124,8 @@ export function loadSave(): SaveData {
       ...defaultSave(),
       ...parsed,
       rescued: { ...parsed.rescued },
+      items: { ...parsed.items },
+      freeUsed: { ...parsed.freeUsed },
       settings: { ...defaultSave().settings, ...parsed.settings },
     };
     // Migrate pre-rescue-arc saves: mochiRescued implies rescued.mochi.

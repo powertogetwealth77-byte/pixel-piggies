@@ -11,7 +11,8 @@
     "typecheck": "tsc --noEmit",
     "verify:levels": "esbuild src/devcheck.ts --bundle --format=esm --outfile=node_modules/.cache/devcheck.mjs --log-level=error && node node_modules/.cache/devcheck.mjs",
     "test:e2e": "node scripts/e2e/e2e.mjs",
-    "test:campaign": "node scripts/e2e/campaign.mjs"
+    "test:campaign": "node scripts/e2e/campaign.mjs",
+    "test:tide": "node scripts/e2e/tide.mjs"
   },
   "dependencies": {
     "react": "^18.3.1",

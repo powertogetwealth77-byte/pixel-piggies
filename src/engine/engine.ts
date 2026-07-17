@@ -381,6 +381,19 @@ export class GameEngine {
     }
   }
 
+  /**
+   * Test-only seam: force a Glitch Strike immediately (used by the browser
+   * E2E to reach the loss/Second-Wind UI without a 45-second real-time idle).
+   * The organic strike path is covered by the deterministic devcheck tests.
+   */
+  debugForceStrike() {
+    if (this.tideCfg.enabled && this.s.phase === 'playing') {
+      this.glitchStrike();
+      this.checkEnd();
+      this.emit();
+    }
+  }
+
   /** Reduce the Tide (matches restore time; big clears push it back). */
   private restoreTide(clearedCount: number) {
     const cfg = this.tideCfg;
