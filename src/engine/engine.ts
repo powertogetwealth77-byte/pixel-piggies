@@ -23,6 +23,12 @@ export const FEVER_MS = 10000;
 export const COMBO_TIMEOUT_MS = 3500;
 /** Delay between cascade stages so each pop reads as its own beat. */
 export const CHAIN_STAGE_MS = 420;
+/**
+ * Piggies rush in FAST so the player never waits (ADHD-friendly constant
+ * flow): an emptied pen refills within this many ms, and a level starts with
+ * every pen already staggered-full. The old per-level spawnMs is ignored.
+ */
+export const FAST_REFILL_MS = 130;
 
 // Active recovery: correct matches shorten the piggy return cooldown. These
 // only ever make piggies arrive *sooner*, so they never affect solvability.
@@ -131,7 +137,7 @@ export class GameEngine {
       feverMsLeft: 0,
       prismUsed: false,
       shotsFired: 0,
-      spawnTimer: 700, // small grace before first spawn
+      spawnTimer: FAST_REFILL_MS,
       comboTimer: 0,
       elapsedMs: 0,
       blocksTotal: countBlocks(board),
@@ -201,7 +207,8 @@ export class GameEngine {
       lastChain: s.lastChain,
       chainPending: s.pendingChain !== null,
       elapsedMs: s.elapsedMs,
-      closeCall: filledPens >= this.level.pens - 1 && s.queue.length > 0,
+      // "Close call" now means running LOW on piggies (no overflow any more).
+      closeCall: s.queue.length === 0 && filledPens <= 1 && remaining > 0,
       lossReason: s.lossReason,
       tideEnabled: this.tideCfg.enabled,
       tide: s.tide,
@@ -224,7 +231,7 @@ export class GameEngine {
       if (p) return 1; // occupied → ready
       if (s.queue.length === 0) return -1; // nothing coming → no ring
       if (slot === firstEmpty) {
-        return Math.max(0, Math.min(1, 1 - s.spawnTimer / this.level.spawnMs));
+        return Math.max(0, Math.min(1, 1 - s.spawnTimer / FAST_REFILL_MS));
       }
       return 0; // queued behind, waiting its turn
     });
@@ -238,7 +245,7 @@ export class GameEngine {
   start() {
     if (this.s.phase === 'ready') {
       this.s.phase = 'playing';
-      this.fillPensImmediate(1); // seed one piggy so the player can act at once
+      this.fillPensImmediate(this.s.pens.length); // start with a full hand — no waiting
       this.emit();
     }
   }
@@ -308,21 +315,19 @@ export class GameEngine {
     // never while frozen (chain / freeze pop / fever / post-strike grace).
     this.advanceTide(dtMs);
 
-    // Spawning (paused during fever for a satisfying breather).
-    if (!s.feverActive && s.queue.length > 0) {
+    // Fast refill: piggies rush into empty pens so there is never dead time.
+    // One pen fills per FAST_REFILL_MS for a lively "piggies pouring in" feel,
+    // but that is short enough that play feels continuous. Pens only ever fill
+    // when empty, so they can never overflow — the pressure is the Glitch Tide.
+    if (s.queue.length > 0 && s.pens.some((p) => p === null)) {
       s.spawnTimer -= dtMs;
       if (s.spawnTimer <= 0) {
         const empty = s.pens.findIndex((p) => p === null);
-        if (empty === -1) {
-          // Holding pens overflow -> loss.
-          s.phase = 'lost';
-          s.lossReason = 'overflow';
-          this.emit();
-          return;
-        }
-        s.pens[empty] = s.queue.shift()!;
-        s.spawnTimer = this.level.spawnMs;
+        if (empty !== -1) s.pens[empty] = s.queue.shift()!;
+        s.spawnTimer = FAST_REFILL_MS;
       }
+    } else {
+      s.spawnTimer = FAST_REFILL_MS;
     }
 
     this.checkEnd();
@@ -420,7 +425,7 @@ export class GameEngine {
     const empty = s.pens.findIndex((p) => p === null);
     if (empty === -1) return false;
     s.pens[empty] = s.queue.shift()!;
-    s.spawnTimer = this.level.spawnMs;
+    s.spawnTimer = FAST_REFILL_MS;
     return true;
   }
 
@@ -430,7 +435,7 @@ export class GameEngine {
     for (let slot = 0; slot < s.pens.length; slot++) {
       if (s.pens[slot] == null && s.queue.length > 0) s.pens[slot] = s.queue.shift()!;
     }
-    s.spawnTimer = this.level.spawnMs;
+    s.spawnTimer = FAST_REFILL_MS;
   }
 
   /**

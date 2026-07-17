@@ -435,7 +435,7 @@ export function GameScreen({ level, save, onComplete, onExit, onQuit, onRestart,
         <div className={`praise praise--${praise.tier}`}>{praise.text}</div>
       )}
       {snap.closeCall && snap.phase === 'playing' && !snap.feverActive && (
-        <div className="close-call">Pens almost full!</div>
+        <div className="close-call">Last piggies — make them count!</div>
       )}
 
       {/* First-session coaching (level 1 only, until the first pop) */}

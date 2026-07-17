@@ -158,7 +158,7 @@ async function greedyPlayToWin() {
 }
 
 const results = [];
-for (let id = 1; id <= 15; id++) {
+for (let id = 1; id <= 30; id++) {
   if (!(await ensureLevelSelect())) { fail(`could not reach level select before level ${id}`); break; }
   const tile = page.locator('.level-tile').nth(id - 1);
   if (await tile.isDisabled()) { fail(`level ${id} is locked when it should be unlocked`); break; }
@@ -191,7 +191,7 @@ await ensureLevelSelect();
 const save = await page.evaluate(() => JSON.parse(localStorage.getItem('pixel-piggies-save-v1') || 'null'));
 if (save) {
   const cleared = Object.values(save.levels).filter((l) => l.cleared).length;
-  if (cleared === 15) ok('all 15 levels cleared and saved'); else fail(`only ${cleared}/15 levels saved as cleared`);
+  if (cleared === 30) ok('all 15 levels cleared and saved'); else fail(`only ${cleared}/30 levels saved as cleared`);
   if (save.mochiRescued) ok('Mochi rescue recorded'); else fail('Mochi rescue not recorded');
   // Purchases are never required: the whole campaign was beaten without buying
   // or using a single recovery item, and no free item uses were spent.
