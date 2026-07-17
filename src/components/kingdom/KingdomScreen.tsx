@@ -1,5 +1,6 @@
-import { useState } from 'react';
+import { useEffect, useState } from 'react';
 import { audio } from '../../audio/audio';
+import { telemetry } from '../../telemetry/telemetry';
 import {
   restore,
   unlockedThemes,
@@ -155,13 +156,17 @@ interface Wanderer {
 export function KingdomScreen({ save, onBack, onUpdate, onToast }: Props) {
   const [reacting, setReacting] = useState<string | null>(null);
   const themes = unlockedThemes(save);
-  const fullCount = BUILDINGS.filter((b) => save.kingdom[b.key] >= 100).length;
+
+  // Local playtest stat: kingdom visits (stored on-device only).
+  useEffect(() => {
+    telemetry.kingdomVisit();
+  }, []);
 
   const wanderers: Wanderer[] = [
-    { type: 'mochi', color: 'sky', name: 'Mochi', unlocked: save.mochiRescued, hint: 'Clear Level 5 to rescue Mochi!', dur: 9, delay: 0 },
-    { type: 'pip', color: 'coral', name: 'Pip', unlocked: fullCount >= 1, hint: 'Fully restore one building', dur: 11, delay: 1.2 },
-    { type: 'blaze', color: 'sunny', name: 'Blaze', unlocked: fullCount >= 2, hint: 'Fully restore two buildings', dur: 8, delay: 2.1 },
-    { type: 'prism', color: 'grape', name: 'Prism', unlocked: fullCount >= 3, hint: 'Restore the whole Kingdom', dur: 13, delay: 0.6 },
+    { type: 'mochi', color: 'sky', name: 'Mochi', unlocked: !!save.rescued.mochi, hint: 'Clear Level 5 to rescue Mochi!', dur: 9, delay: 0 },
+    { type: 'pip', color: 'coral', name: 'Pip', unlocked: !!save.rescued.pip, hint: 'Clear Level 8 to rescue Pip!', dur: 11, delay: 1.2 },
+    { type: 'blaze', color: 'sunny', name: 'Blaze', unlocked: !!save.rescued.blaze, hint: 'Clear Level 11 to rescue Blaze!', dur: 8, delay: 2.1 },
+    { type: 'prism', color: 'grape', name: 'Prism', unlocked: !!save.rescued.prism, hint: 'Clear Level 14 to rescue Prism!', dur: 13, delay: 0.6 },
   ];
 
   const doRestore = (b: Building) => {

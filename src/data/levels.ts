@@ -97,7 +97,7 @@ export const LEVELS: LevelDef[] = [
     name: 'The Rescue',
     tagline: 'Clear the cage to rescue Mochi the piggy!',
     pictureName: 'Mochi Freed',
-    rescue: true,
+    rescue: 'mochi',
     blocks: ['gggggg', 'gmmmmg', 'gmssmg', 'gmmmmg', 'gggggg'],
     picture: ['.pppp.', 'p.pp.p', 'pppppp', 'p.pp.p', '.p..p.'],
     pens: 5,
@@ -166,8 +166,9 @@ export const LEVELS: LevelDef[] = [
   {
     id: 8,
     name: 'Warm Bakery',
-    tagline: 'Bake a treat and earn extra Pigment!',
+    tagline: 'Pip is trapped in the pantry — bake him free!',
     pictureName: 'Cupcake',
+    rescue: 'pip',
     blocks: ['ssssss', 'scccps', 'cccccc', 'sccccs', 'ssmmss', 'ssmmss'],
     picture: ['..pp..', '.pppp.', 'prprpr', 'oooooo', '.enne.', '.eeee.'],
     pens: 5,
@@ -230,8 +231,9 @@ export const LEVELS: LevelDef[] = [
   {
     id: 11,
     name: 'Bubbling Fountain',
-    tagline: 'Restore the fountain sparkle for the Kingdom.',
+    tagline: 'Blaze fell in the fountain basin — fish him out!',
     pictureName: 'Fountain',
+    rescue: 'blaze',
     blocks: ['bbsbbs', 'bsbbsb', 'bbbbbb', 'gbbbbg', 'ggbbgg', 'gggggg'],
     picture: ['.l..l.', 'l.ll.l', '.llll.', 'bbbbbb', '.bbbb.', 'kkkkkk'],
     pens: 5,
@@ -308,8 +310,9 @@ export const LEVELS: LevelDef[] = [
   {
     id: 14,
     name: 'Festival Lights',
-    tagline: 'Huge combos light up the whole board!',
+    tagline: 'Prism is lost in the fireworks — light the way!',
     pictureName: 'Fireworks',
+    rescue: 'prism',
     blocks: [
       'mmmgggmmm',
       'mmmgggmmm',

@@ -1,6 +1,8 @@
 // Local save / progression system backed by localStorage.
 
-import { LEVEL_COUNT } from '../data/levels';
+import { LEVELS, LEVEL_COUNT } from '../data/levels';
+import { RESCUE_ARCS } from '../data/piggies';
+import type { PiggyType } from '../engine/types';
 
 export interface LevelProgress {
   stars: number;
@@ -24,7 +26,12 @@ export interface SaveData {
   coins: number;
   pigment: number;
   kingdom: KingdomState;
+  /** Kept for backwards compatibility with old saves; mirrors rescued.mochi. */
   mochiRescued: boolean;
+  /** Which hero piggies have been rescued from their milestone levels. */
+  rescued: Partial<Record<PiggyType, boolean>>;
+  /** Daily bonus board state: last completed date (YYYY-MM-DD). */
+  dailyDone: string | null;
   settings: {
     muted: boolean;
     musicOff: boolean;
@@ -48,6 +55,8 @@ export function defaultSave(): SaveData {
     pigment: 0,
     kingdom: { house: 0, bakery: 0, fountain: 0 },
     mochiRescued: false,
+    rescued: {},
+    dailyDone: null,
     settings: {
       muted: false,
       musicOff: false,
@@ -67,7 +76,15 @@ export function loadSave(): SaveData {
     const parsed = JSON.parse(raw) as SaveData;
     if (parsed.version !== VERSION) return defaultSave();
     // Fill any missing fields defensively.
-    return { ...defaultSave(), ...parsed, settings: { ...defaultSave().settings, ...parsed.settings } };
+    const merged: SaveData = {
+      ...defaultSave(),
+      ...parsed,
+      rescued: { ...parsed.rescued },
+      settings: { ...defaultSave().settings, ...parsed.settings },
+    };
+    // Migrate pre-rescue-arc saves: mochiRescued implies rescued.mochi.
+    if (merged.mochiRescued) merged.rescued.mochi = true;
+    return merged;
   } catch {
     return defaultSave();
   }
@@ -110,8 +127,15 @@ export function applyLevelResult(prev: SaveData, reward: LevelReward): SaveData 
   // Pigment only granted on the first clear of a level (progression currency).
   if (firstClear) {
     next.pigment += reward.pigment;
-    // Rescue Mochi on completing level 5.
-    if (reward.levelId === 5) next.mochiRescued = true;
+    // Rescue milestone: free the caged hero and grant their one-time reward.
+    const hero = LEVELS.find((l) => l.id === reward.levelId)?.rescue;
+    if (hero && !next.rescued[hero]) {
+      next.rescued[hero] = true;
+      if (hero === 'mochi') next.mochiRescued = true;
+      const arc = RESCUE_ARCS[hero];
+      next.coins += arc.reward.coins;
+      next.pigment += arc.reward.pigment;
+    }
   }
 
   // Unlock next level.

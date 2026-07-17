@@ -52,8 +52,8 @@ export interface LevelDef {
   starScores: [number, number, number];
   /** Pigment awarded on first clear. */
   pigment: number;
-  /** Optional special flag, e.g. rescue level. */
-  rescue?: boolean;
+  /** Which piggy hero is caged in this level (rescue milestone). */
+  rescue?: PiggyType;
 }
 
 export type GamePhase = 'ready' | 'playing' | 'paused' | 'won' | 'lost';

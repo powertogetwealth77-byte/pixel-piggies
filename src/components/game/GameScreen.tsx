@@ -4,6 +4,9 @@ import type { LevelDef } from '../../engine/types';
 import type { LevelReward, SaveData } from '../../save/save';
 import { audio, vibrate } from '../../audio/audio';
 import { PICTURE_CHAR } from '../../data/palette';
+import { PIGGIES } from '../../data/piggies';
+import { LEVELS } from '../../data/levels';
+import { telemetry } from '../../telemetry/telemetry';
 import { Board } from './Board';
 import { Pens } from './Pens';
 import { Stars } from '../ui/Stars';
@@ -57,12 +60,13 @@ export function GameScreen({ level, save, onComplete, onExit, onQuit, onRestart,
     lossReason?: 'overflow' | 'ammo';
   }>(null);
 
-  // Start engine + music.
+  // Start engine + music; record the attempt locally.
   useEffect(() => {
     engine.start();
     audio.startMusic();
+    telemetry.levelStart(level.id);
     return () => audio.stopMusic();
-  }, [engine]);
+  }, [engine, level.id]);
 
   // React to launches: sounds, haptics, screen shake, combo bump.
   useEffect(() => {
@@ -74,6 +78,7 @@ export function GameScreen({ level, save, onComplete, onExit, onQuit, onRestart,
       audio.fizzle();
       vibrate(30);
       setMoodFor('sad', 800);
+      telemetry.fizzle(level.id);
       return;
     }
     const big = l.cleared.length >= 5 || l.comboAfter >= 8;
@@ -112,6 +117,7 @@ export function GameScreen({ level, save, onComplete, onExit, onQuit, onRestart,
       audio.feverStart();
       setShowFeverBanner(true);
       setMoodFor('wow', 1400);
+      telemetry.fever();
       vibrate([40, 40, 40, 40]);
       window.setTimeout(() => setShowFeverBanner(false), 1400);
     } else if (!snap.feverActive && prevFever.current) {
@@ -158,11 +164,14 @@ export function GameScreen({ level, save, onComplete, onExit, onQuit, onRestart,
       onComplete(reward);
       audio.win();
       vibrate([60, 40, 80]);
+      telemetry.levelEnd(level.id, true, snap.elapsedMs, snap.bestCombo);
+      if (level.id === 1) telemetry.tutorialDone();
       setResult({ won: true, reward });
     } else if (snap.phase === 'lost') {
       completedRef.current = true;
       audio.lose();
       vibrate(200);
+      telemetry.levelEnd(level.id, false, snap.elapsedMs, snap.bestCombo);
       setResult({
         won: false,
         reward: { levelId: level.id, stars: 0, score: snap.score, bestCombo: snap.bestCombo, coins: 0, pigment: 0 },
@@ -225,6 +234,7 @@ export function GameScreen({ level, save, onComplete, onExit, onQuit, onRestart,
   });
   // Parent remounts this screen with a fresh key, restarting the level in place.
   const restart = () => {
+    telemetry.retry(level.id);
     onRestart();
   };
 
@@ -339,11 +349,7 @@ export function GameScreen({ level, save, onComplete, onExit, onQuit, onRestart,
         <ResultDialog
           level={level}
           result={result}
-          teaser={
-            result.won && !save.mochiRescued && level.id < 5
-              ? `🐷 Mochi's rescue is ${5 - level.id} level${5 - level.id === 1 ? '' : 's'} away!`
-              : undefined
-          }
+          teaser={result.won ? rescueTeaser(level.id, save) : undefined}
           onKingdom={
             result.won &&
             save.pigment >= 20 &&
@@ -357,6 +363,15 @@ export function GameScreen({ level, save, onComplete, onExit, onQuit, onRestart,
       )}
     </div>
   );
+}
+
+/** Countdown to the next caged hero, shown on campaign win dialogs. */
+function rescueTeaser(levelId: number, save: SaveData): string | undefined {
+  const next = LEVELS.find((l) => l.rescue && !save.rescued[l.rescue] && l.id > levelId);
+  if (!next || !next.rescue || levelId > 15) return undefined;
+  const name = PIGGIES[next.rescue].name;
+  const toGo = next.id - levelId;
+  return `🐷 ${name}'s rescue is ${toGo} level${toGo === 1 ? '' : 's'} away!`;
 }
 
 function ResultDialog({

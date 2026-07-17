@@ -1,5 +1,7 @@
 import { LEVELS } from '../../data/levels';
+import { PIGGIES } from '../../data/piggies';
 import type { SaveData } from '../../save/save';
+import { todayKey, DAILY_PIGMENT } from '../../daily/daily';
 import { Stars } from '../ui/Stars';
 
 interface Props {
@@ -7,12 +9,13 @@ interface Props {
   onBack: () => void;
   onKingdom: () => void;
   onSelect: (id: number) => void;
+  onDaily: () => void;
 }
 
-export function LevelSelect({ save, onBack, onKingdom, onSelect }: Props) {
+export function LevelSelect({ save, onBack, onKingdom, onSelect, onDaily }: Props) {
   const nextLocked = save.unlockedLevel;
-  // Compute the current "reason to continue".
   const goal = nextGoal(save);
+  const dailyDone = save.dailyDone === todayKey();
 
   return (
     <div className="screen">
@@ -25,6 +28,23 @@ export function LevelSelect({ save, onBack, onKingdom, onSelect }: Props) {
           🏰
         </button>
       </div>
+
+      <button
+        className={`daily-card ${dailyDone ? 'done' : ''}`}
+        onClick={dailyDone ? undefined : onDaily}
+        disabled={dailyDone}
+      >
+        <span className="daily-icon">{dailyDone ? '✅' : '🎁'}</span>
+        <span className="daily-text">
+          <b>Daily Bonus</b>
+          <small>
+            {dailyDone
+              ? 'Done for today — a new board arrives tomorrow!'
+              : `One fresh board · earn ${DAILY_PIGMENT} Pigment`}
+          </small>
+        </span>
+        {!dailyDone && <span className="daily-go">Play ›</span>}
+      </button>
 
       <div className="card" style={{ textAlign: 'center', fontWeight: 800 }}>
         🎯 {goal}
@@ -49,7 +69,9 @@ export function LevelSelect({ save, onBack, onKingdom, onSelect }: Props) {
                 <>
                   <span>{lvl.id}</span>
                   <Stars value={prog?.stars ?? 0} size={13} />
-                  {lvl.rescue && <small>RESCUE</small>}
+                  {lvl.rescue && (
+                    <small>{save.rescued[lvl.rescue] ? '💚' : 'RESCUE'}</small>
+                  )}
                   {!lvl.rescue && prog?.bestScore ? (
                     <small className="tile-best">🏆 {prog.bestScore.toLocaleString()}</small>
                   ) : null}
@@ -64,9 +86,14 @@ export function LevelSelect({ save, onBack, onKingdom, onSelect }: Props) {
 }
 
 function nextGoal(save: SaveData): string {
-  if (!save.mochiRescued) {
-    const toGo = Math.max(0, 5 - (save.unlockedLevel - 1));
-    if (save.unlockedLevel <= 5) return `Reach Level 5 to rescue Mochi! (${toGo} to go)`;
+  // The nearest hero still waiting in a cage drives the goal line.
+  const nextRescue = LEVELS.find((l) => l.rescue && !save.rescued[l.rescue]);
+  if (nextRescue && nextRescue.rescue) {
+    const toGo = Math.max(0, nextRescue.id - (save.unlockedLevel - 1));
+    const name = PIGGIES[nextRescue.rescue].name;
+    return toGo > 0
+      ? `Reach Level ${nextRescue.id} to rescue ${name}! (${toGo} to go)`
+      : `Rescue ${name} in Level ${nextRescue.id}!`;
   }
   if (save.kingdom.house < 100) return 'Earn Pigment to repair the Piggy House!';
   if (save.kingdom.bakery < 100) return 'Restore the Bakery for the Kingdom!';

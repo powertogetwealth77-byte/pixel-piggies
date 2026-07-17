@@ -1,4 +1,4 @@
-import { useCallback, useEffect, useRef, useState } from 'react';
+import { useCallback, useEffect, useMemo, useRef, useState } from 'react';
 import { LEVELS } from './data/levels';
 import { audio, setHaptics } from './audio/audio';
 import {
@@ -9,6 +9,9 @@ import {
   type LevelReward,
   type SaveData,
 } from './save/save';
+import { telemetry } from './telemetry/telemetry';
+import { generateDailyLevel, todayKey } from './daily/daily';
+import type { PiggyType } from './engine/types';
 import { MainMenu } from './components/screens/MainMenu';
 import { LevelSelect } from './components/screens/LevelSelect';
 import { SettingsScreen } from './components/screens/SettingsScreen';
@@ -21,14 +24,20 @@ export type Screen =
   | { name: 'levels' }
   | { name: 'settings' }
   | { name: 'kingdom' }
-  | { name: 'rescue' }
-  | { name: 'game'; levelId: number; runId?: number };
+  | { name: 'rescue'; piggy: PiggyType }
+  | { name: 'game'; levelId: number; runId?: number }
+  | { name: 'daily'; runId?: number };
 
 export function App() {
   const [save, setSave] = useState<SaveData>(() => loadSave());
   const [screen, setScreen] = useState<Screen>({ name: 'menu' });
   const [toast, setToast] = useState<string | null>(null);
-  const pendingRescue = useRef(false);
+  const pendingRescue = useRef<PiggyType | null>(null);
+
+  // One local session record per app load (no external tracking).
+  useEffect(() => {
+    telemetry.session();
+  }, []);
 
   // Apply persisted settings to audio, haptics + motion.
   useEffect(() => {
@@ -60,19 +69,42 @@ export function App() {
       const wasFirstClear = !save.levels[reward.levelId]?.cleared;
       const next = applyLevelResult(save, reward);
       update(next);
-      // Trigger the Mochi rescue sequence after first clearing level 5.
-      if (reward.levelId === 5 && wasFirstClear && !save.mochiRescued) {
-        pendingRescue.current = true;
+      // Queue the rescue story after first clearing a rescue milestone.
+      const hero = LEVELS.find((l) => l.id === reward.levelId)?.rescue;
+      if (hero && wasFirstClear && !save.rescued[hero]) {
+        pendingRescue.current = hero;
+        telemetry.rescue(hero);
       }
     },
     [save, update],
   );
 
+  // Daily bonus: generated fresh each day, validated by the solver.
+  const dailyLevel = useMemo(() => generateDailyLevel(todayKey()), []);
+
+  const handleDailyComplete = useCallback(
+    (reward: LevelReward) => {
+      if (!reward.stars) return; // losses can be retried the same day
+      const next: SaveData = {
+        ...save,
+        coins: save.coins + reward.coins,
+        pigment: save.pigment + dailyLevel.pigment,
+        dailyDone: todayKey(),
+      };
+      update(next);
+      telemetry.dailyDone();
+    },
+    [save, update, dailyLevel],
+  );
+
   const exitGame = useCallback(
     (lastLevelId: number) => {
       if (pendingRescue.current) {
-        pendingRescue.current = false;
-        go({ name: 'rescue' });
+        const hero = pendingRescue.current;
+        pendingRescue.current = null;
+        go({ name: 'rescue', piggy: hero });
+      } else if (lastLevelId === dailyLevel.id) {
+        go({ name: 'levels' });
       } else if (lastLevelId % 3 === 0 && save.levels[lastLevelId]?.cleared) {
         // Every few levels, surface Kingdom restoration progress.
         go({ name: 'kingdom' });
@@ -80,7 +112,7 @@ export function App() {
         go({ name: 'levels' });
       }
     },
-    [go, save.levels],
+    [go, save.levels, dailyLevel.id],
   );
 
   return (
@@ -104,6 +136,7 @@ export function App() {
           onBack={() => go({ name: 'menu' })}
           onKingdom={() => go({ name: 'kingdom' })}
           onSelect={(id) => go({ name: 'game', levelId: id })}
+          onDaily={() => go({ name: 'daily' })}
         />
       )}
 
@@ -125,6 +158,24 @@ export function App() {
         />
       )}
 
+      {screen.name === 'daily' && (
+        <GameScreen
+          key={`daily:${todayKey()}:${screen.runId ?? 0}`}
+          level={dailyLevel}
+          save={save}
+          onComplete={handleDailyComplete}
+          onExit={exitGame}
+          onQuit={() => go({ name: 'levels' })}
+          onRestart={() =>
+            setScreen((s) =>
+              s.name === 'daily' ? { ...s, runId: (s.runId ?? 0) + 1 } : s,
+            )
+          }
+          onKingdom={() => go({ name: 'kingdom' })}
+          onToast={showToast}
+        />
+      )}
+
       {screen.name === 'kingdom' && (
         <KingdomScreen
           save={save}
@@ -134,7 +185,9 @@ export function App() {
         />
       )}
 
-      {screen.name === 'rescue' && <RescueScreen onDone={() => go({ name: 'kingdom' })} />}
+      {screen.name === 'rescue' && (
+        <RescueScreen piggy={screen.piggy} onDone={() => go({ name: 'kingdom' })} />
+      )}
 
       {screen.name === 'settings' && (
         <SettingsScreen

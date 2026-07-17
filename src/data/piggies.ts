@@ -41,3 +41,43 @@ export const PIGGIES: Record<PiggyType, PiggyDef> = {
 };
 
 export const PIGGY_ORDER: PiggyType[] = ['pip', 'mochi', 'blaze', 'prism'];
+
+/** Per-hero rescue arc: story beats, avatar color, and one-time reward. */
+export interface RescueArc {
+  type: PiggyType;
+  color: 'coral' | 'sunny' | 'mint' | 'sky' | 'grape';
+  caged: string; // where they were trapped
+  joins: string; // what they bring to the team
+  reward: { coins: number; pigment: number };
+}
+
+export const RESCUE_ARCS: Record<PiggyType, RescueArc> = {
+  mochi: {
+    type: 'mochi',
+    color: 'sky',
+    caged: 'locked in a pixel cage deep in the grape thicket',
+    joins: 'Mochi joins your team and can now help restore the Piggy Kingdom.',
+    reward: { coins: 100, pigment: 0 },
+  },
+  pip: {
+    type: 'pip',
+    color: 'coral',
+    caged: 'stuck behind the bakery pantry wall',
+    joins: 'Pip grabs his drill and starts fixing up the Kingdom.',
+    reward: { coins: 150, pigment: 0 },
+  },
+  blaze: {
+    type: 'blaze',
+    color: 'sunny',
+    caged: 'soggy and shivering at the bottom of the old fountain',
+    joins: 'Blaze dries off and brings the party back to the meadow.',
+    reward: { coins: 0, pigment: 40 },
+  },
+  prism: {
+    type: 'prism',
+    color: 'grape',
+    caged: 'dazed and lost inside the festival fireworks',
+    joins: 'Prism lights up the whole Kingdom with rainbow sparkles.',
+    reward: { coins: 0, pigment: 60 },
+  },
+};

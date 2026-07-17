@@ -3,6 +3,7 @@ import { audio } from '../../audio/audio';
 import type { SaveData } from '../../save/save';
 import { LEVELS } from '../../data/levels';
 import { solveAll, type SolveReport } from '../../engine/solver';
+import { telemetry } from '../../telemetry/telemetry';
 
 interface Props {
   save: SaveData;
@@ -99,6 +100,8 @@ export function SettingsScreen({ save, onBack, onUpdate, onReset, onToast }: Pro
         </div>
       </div>
 
+      <PlaytestStats onToast={onToast} />
+
       <div className="dev-row">
         <button className="dev-link" onClick={runVerify}>
           🛠 Verify all levels are solvable
@@ -117,6 +120,60 @@ export function SettingsScreen({ save, onBack, onUpdate, onReset, onToast }: Pro
       <p style={{ textAlign: 'center', opacity: 0.6, fontSize: '0.8rem' }}>
         Pixel Piggies — original game. Art, sound &amp; code made from scratch.
       </p>
+    </div>
+  );
+}
+
+/** On-device playtest stats: never leave this browser unless YOU export them. */
+function PlaytestStats({ onToast }: { onToast: (msg: string) => void }) {
+  const [, force] = useState(0);
+  const t = telemetry.snapshot();
+  const totals = Object.values(t.levels).reduce(
+    (acc, l) => ({
+      attempts: acc.attempts + l.attempts,
+      losses: acc.losses + l.losses,
+      fizzles: acc.fizzles + l.fizzles,
+    }),
+    { attempts: 0, losses: 0, fizzles: 0 },
+  );
+
+  return (
+    <div className="card">
+      <div className="row row--between" style={{ marginBottom: 8 }}>
+        <b>📊 Playtest stats</b>
+        <small style={{ opacity: 0.65 }}>stored only on this device</small>
+      </div>
+      <div className="stats-grid">
+        <span>🗓 {t.daysPlayed.length} days · {t.sessions} sessions</span>
+        <span>🎮 {totals.attempts} attempts · {totals.losses} losses</span>
+        <span>💨 {totals.fizzles} fizzles · 🔥 {t.feverActivations} fevers</span>
+        <span>⚡ best combo {t.largestCombo} · 🏰 {t.kingdomVisits} visits</span>
+        <span>🐷 {Object.keys(t.rescues).length}/4 rescued · 🎁 {t.dailiesCompleted} dailies</span>
+        <span>🎓 tutorial {t.tutorialCompleted ? 'done' : 'not yet'}</span>
+      </div>
+      <div className="row" style={{ marginTop: 10 }}>
+        <button
+          className="btn btn--ghost btn--block"
+          style={{ minHeight: 42, padding: '8px 12px', fontSize: '0.85rem' }}
+          onClick={() => {
+            telemetry.export();
+            onToast('Stats downloaded as JSON');
+          }}
+        >
+          ⬇ Export JSON
+        </button>
+        <button
+          className="btn btn--ghost btn--block"
+          style={{ minHeight: 42, padding: '8px 12px', fontSize: '0.85rem' }}
+          onClick={() => {
+            telemetry.reset();
+            force((n) => n + 1);
+            onToast('Playtest stats reset');
+          }}
+        >
+          🗑 Reset stats
+        </button>
+      </div>
     </div>
   );
 }

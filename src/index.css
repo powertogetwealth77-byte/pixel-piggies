@@ -1521,3 +1521,85 @@ body.color-symbols .block-symbol {
   text-decoration: underline;
   padding: 6px;
 }
+
+/* ---------- Daily bonus card ---------- */
+.daily-card {
+  display: flex;
+  align-items: center;
+  gap: 12px;
+  width: 100%;
+  padding: 14px 16px;
+  border-radius: var(--radius);
+  background: linear-gradient(120deg, rgba(255, 200, 61, 0.22), rgba(255, 100, 120, 0.18));
+  border: 2px solid rgba(255, 200, 61, 0.45);
+  box-shadow: 0 0 18px rgba(255, 200, 61, 0.2), var(--shadow);
+  text-align: left;
+  font-family: inherit;
+  color: var(--cream);
+}
+.daily-card.done {
+  background: rgba(255, 255, 255, 0.08);
+  border-color: rgba(255, 255, 255, 0.18);
+  box-shadow: none;
+  opacity: 0.8;
+  cursor: default;
+}
+.daily-icon {
+  font-size: 1.7rem;
+}
+.daily-text {
+  flex: 1;
+  display: grid;
+  gap: 2px;
+}
+.daily-text b {
+  font-size: 1rem;
+}
+.daily-text small {
+  font-size: 0.74rem;
+  opacity: 0.85;
+  font-weight: 700;
+}
+.daily-go {
+  font-weight: 900;
+  color: var(--sunny);
+  white-space: nowrap;
+}
+
+/* ---------- Rescue story stage ---------- */
+.rescue-stage {
+  position: relative;
+  display: grid;
+  place-items: center;
+  min-height: 140px;
+}
+.rescue-cage {
+  position: absolute;
+  width: 128px;
+  height: 128px;
+  animation: cage-rattle 0.7s ease-in-out infinite;
+}
+@keyframes cage-rattle {
+  0%,
+  100% {
+    transform: rotate(-1.2deg);
+  }
+  50% {
+    transform: rotate(1.2deg);
+  }
+}
+
+/* ---------- Playtest stats ---------- */
+.stats-grid {
+  display: grid;
+  grid-template-columns: 1fr 1fr;
+  gap: 6px 12px;
+  font-size: 0.76rem;
+  font-weight: 700;
+  opacity: 0.9;
+}
+@media (max-width: 420px) {
+  .stats-grid {
+    grid-template-columns: 1fr;
+  }
+}
