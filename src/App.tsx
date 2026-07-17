@@ -14,6 +14,7 @@ import { telemetry } from './telemetry/telemetry';
 import { generateDailyLevel, todayKey } from './daily/daily';
 import type { PiggyType } from './engine/types';
 import { MainMenu } from './components/screens/MainMenu';
+import { StoryCinematic } from './components/screens/StoryCinematic';
 import { LevelSelect } from './components/screens/LevelSelect';
 import { SettingsScreen } from './components/screens/SettingsScreen';
 import { KingdomScreen } from './components/kingdom/KingdomScreen';
@@ -23,6 +24,7 @@ import { RescueScreen } from './components/screens/RescueScreen';
 
 export type Screen =
   | { name: 'menu' }
+  | { name: 'intro'; replay?: boolean }
   | { name: 'levels' }
   | { name: 'settings' }
   | { name: 'kingdom' }
@@ -32,8 +34,13 @@ export type Screen =
   | { name: 'daily'; runId?: number };
 
 export function App() {
-  const [save, setSave] = useState<SaveData>(() => loadSave());
-  const [screen, setScreen] = useState<Screen>({ name: 'menu' });
+  const initial = useRef<SaveData>(loadSave()).current;
+  const [save, setSave] = useState<SaveData>(initial);
+  // First-run players meet Pip through the opening cinematic; returning players
+  // (and anyone who's seen it) land on the menu.
+  const [screen, setScreen] = useState<Screen>(
+    initial.story.introSeen ? { name: 'menu' } : { name: 'intro' },
+  );
   const [toast, setToast] = useState<string | null>(null);
   const pendingRescue = useRef<PiggyType | null>(null);
 
@@ -66,6 +73,12 @@ export function App() {
     audio.resume();
     setScreen(s);
   }, []);
+
+  // Finish the opening cinematic: mark it seen (once) and drop to the menu.
+  const finishIntro = useCallback(() => {
+    if (!save.story.introSeen) update({ ...save, story: { ...save.story, introSeen: true } });
+    go({ name: 'menu' });
+  }, [save, update, go]);
 
   const handleLevelComplete = useCallback(
     (reward: LevelReward): RewardSummary => {
@@ -149,6 +162,10 @@ export function App() {
 
   return (
     <div className="app">
+      {screen.name === 'intro' && (
+        <StoryCinematic replay={screen.replay} onDone={finishIntro} />
+      )}
+
       {screen.name === 'menu' && (
         <MainMenu
           save={save}
@@ -160,6 +177,7 @@ export function App() {
           onKingdom={() => go({ name: 'kingdom' })}
           onSanctuary={() => go({ name: 'sanctuary' })}
           onSettings={() => go({ name: 'settings' })}
+          onStory={() => go({ name: 'intro', replay: true })}
         />
       )}
 

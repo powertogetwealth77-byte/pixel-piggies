@@ -2109,3 +2109,129 @@ body.color-symbols .block-symbol {
   font-weight: 800;
 }
 .sanctuary-cta p { margin: 0; text-align: left; }
+
+/* ---- Story cinematic ---- */
+.cine {
+  position: relative;
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  justify-content: center;
+  min-height: 100dvh;
+  gap: 26px;
+  padding: 32px 24px;
+  cursor: pointer;
+  text-align: center;
+  overflow: hidden;
+  color: #fff;
+  transition: background 0.6s ease;
+}
+.cine--dawn { background: linear-gradient(180deg, #fbc687 0%, #f8a06a 45%, #6d5b8f 100%); }
+.cine--festival { background: linear-gradient(180deg, #3a2c6e 0%, #6b4a9e 55%, #f0a9c8 100%); }
+.cine--red { background: linear-gradient(180deg, #2a0d16 0%, #7a1023 55%, #d64533 100%); }
+.cine--ash { background: linear-gradient(180deg, #1a1a22 0%, #3d3540 55%, #705a52 100%); }
+.cine--root { background: linear-gradient(180deg, #201a2e 0%, #3f2f52 55%, #caa06a 100%); }
+.cine--hope { background: linear-gradient(180deg, #2b2350 0%, #5b57a8 45%, #ffd97a 100%); }
+.cine-skip {
+  position: absolute;
+  top: 16px;
+  right: 16px;
+  background: rgba(0, 0, 0, 0.28);
+  color: #fff;
+  border: 1px solid rgba(255, 255, 255, 0.35);
+  border-radius: 999px;
+  padding: 7px 16px;
+  font-weight: 800;
+  font-size: 0.82rem;
+  cursor: pointer;
+  z-index: 2;
+}
+.cine-stage {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: 22px;
+  max-width: 540px;
+  animation: cine-in 0.5s ease both;
+}
+.cine-emblem {
+  font-size: 5.2rem;
+  filter: drop-shadow(0 8px 18px rgba(0, 0, 0, 0.35));
+  animation: cine-float 3.4s ease-in-out infinite;
+}
+.cine-lines p {
+  margin: 0 0 8px;
+  font-size: 1.12rem;
+  font-weight: 800;
+  line-height: 1.5;
+  text-shadow: 0 2px 12px rgba(0, 0, 0, 0.45);
+  animation: cine-line 0.6s ease both;
+}
+.cine-dots {
+  display: flex;
+  gap: 8px;
+  z-index: 2;
+}
+.cine-dots span {
+  width: 8px;
+  height: 8px;
+  border-radius: 50%;
+  background: rgba(255, 255, 255, 0.35);
+  transition: background 0.3s, transform 0.3s;
+}
+.cine-dots span.on { background: #fff; transform: scale(1.35); }
+.cine-dots span.done { background: rgba(255, 255, 255, 0.7); }
+.cine-hint {
+  position: absolute;
+  bottom: 18px;
+  margin: 0;
+  font-size: 0.74rem;
+  font-weight: 700;
+  opacity: 0.7;
+  letter-spacing: 0.04em;
+}
+@keyframes cine-in { from { opacity: 0; transform: translateY(12px); } to { opacity: 1; transform: none; } }
+@keyframes cine-line { from { opacity: 0; transform: translateY(8px); } to { opacity: 1; transform: none; } }
+@keyframes cine-float { 0%, 100% { transform: translateY(0); } 50% { transform: translateY(-10px); } }
+.reduced-motion .cine-emblem,
+.reduced-motion .cine-stage,
+.reduced-motion .cine-lines p { animation: none; }
+
+/* ---- Chapter framing on the world map ---- */
+.chapter-eyebrow {
+  display: inline-block;
+  font-size: 0.66rem;
+  font-weight: 900;
+  letter-spacing: 0.09em;
+  text-transform: uppercase;
+  opacity: 0.85;
+  margin-bottom: 2px;
+}
+.chapter-beat {
+  margin: 4px 0 0;
+  font-size: 0.76rem;
+  font-weight: 600;
+  line-height: 1.4;
+  opacity: 0.82;
+  font-style: italic;
+}
+
+/* ---- Sanctuary restoration narration + memory line ---- */
+.restore-banner {
+  background: linear-gradient(135deg, rgba(120, 200, 140, 0.18), rgba(255, 214, 122, 0.16));
+  border: 1px solid rgba(120, 200, 140, 0.4);
+  border-radius: 14px;
+  padding: 10px 14px;
+  text-align: center;
+}
+.restore-banner b { display: block; font-size: 0.92rem; }
+.restore-banner p { margin: 3px 0 0; font-size: 0.8rem; font-weight: 600; opacity: 0.85; line-height: 1.4; }
+.rescue-memory {
+  margin: 2px 0 0;
+  font-size: 0.85rem;
+  font-weight: 700;
+  font-style: italic;
+  line-height: 1.45;
+  opacity: 0.92;
+  max-width: 320px;
+}

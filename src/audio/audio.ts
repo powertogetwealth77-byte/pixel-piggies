@@ -258,6 +258,12 @@ class AudioManager {
     for (let i = 0; i < 5; i++) this.tone(880 + i * 90, 0.07, 'square', 0.12, i * 0.055);
   }
 
+  /** Gentle two-note pad for a story cinematic panel. */
+  storyChime() {
+    this.tone(392, 0.5, 'sine', 0.08, 0, 523);
+    this.tone(523, 0.6, 'triangle', 0.06, 0.16);
+  }
+
   spawn() {
     this.tone(660, 0.09, 'sine', 0.14, 0, 880);
   }

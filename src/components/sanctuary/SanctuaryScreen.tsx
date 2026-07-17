@@ -2,6 +2,7 @@ import { useEffect, useState } from 'react';
 import { audio } from '../../audio/audio';
 import { telemetry } from '../../telemetry/telemetry';
 import { SANCTUARY, SANCTUARY_COUNT, type CaptivePig } from '../../data/sanctuary';
+import { sanctuaryTier } from '../../data/story';
 import { canAffordPig, freePig, freedPigCount, type SaveData } from '../../save/save';
 import { PiggyAvatar } from '../ui/PiggyAvatar';
 
@@ -20,6 +21,7 @@ interface Props {
 export function SanctuaryScreen({ save, onBack, onUpdate, onToast }: Props) {
   const [celebrating, setCelebrating] = useState<CaptivePig | null>(null);
   const freed = freedPigCount(save);
+  const tier = sanctuaryTier(freed);
 
   useEffect(() => {
     telemetry.sanctuaryVisit();
@@ -39,6 +41,7 @@ export function SanctuaryScreen({ save, onBack, onUpdate, onToast }: Props) {
     telemetry.pigFreed();
     audio.star();
     audio.squeal();
+    if (pig.story) window.setTimeout(() => audio.storyChime(), 500); // memory beat
     setCelebrating(pig);
     window.setTimeout(() => setCelebrating((c) => (c === pig ? null : c)), 1700);
   };
@@ -57,6 +60,12 @@ export function SanctuaryScreen({ save, onBack, onUpdate, onToast }: Props) {
         <span className="pill">🐷 {freed}/{SANCTUARY_COUNT} freed</span>
         <span className="pill">🪙 {save.coins.toLocaleString()}</span>
         <span className="pill">🎟️ {save.rescueTokens}</span>
+      </div>
+
+      {/* Restoration narration — grows as the herd comes home. */}
+      <div className="restore-banner">
+        <b>🌳 {tier.title}</b>
+        <p>{tier.line}</p>
       </div>
 
       {/* Happy meadow of freed piggies */}
@@ -141,6 +150,7 @@ export function SanctuaryScreen({ save, onBack, onUpdate, onToast }: Props) {
             </div>
             <h2>{celebrating.name} is free! 🎉</h2>
             <p style={{ fontWeight: 700, margin: 0, opacity: 0.9 }}>{celebrating.blurb}</p>
+            {celebrating.story && <p className="rescue-memory">💛 {celebrating.story}</p>}
             <p style={{ margin: 0, opacity: 0.75, fontSize: '0.85rem' }}>
               {freed}/{SANCTUARY_COUNT} piggies rescued
             </p>

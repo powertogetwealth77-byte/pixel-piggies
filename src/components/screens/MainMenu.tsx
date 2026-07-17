@@ -11,6 +11,7 @@ interface Props {
   onKingdom: () => void;
   onSanctuary: () => void;
   onSettings: () => void;
+  onStory: () => void;
 }
 
 const HERO_COLORS: Record<PiggyType, ColorId> = {
@@ -20,7 +21,7 @@ const HERO_COLORS: Record<PiggyType, ColorId> = {
   prism: 'grape',
 };
 
-export function MainMenu({ save, onPlay, onKingdom, onSanctuary, onSettings }: Props) {
+export function MainMenu({ save, onPlay, onKingdom, onSanctuary, onSettings, onStory }: Props) {
   const stars = totalStars(save);
   return (
     <div className="screen screen--menu">
@@ -28,7 +29,7 @@ export function MainMenu({ save, onPlay, onKingdom, onSanctuary, onSettings }: P
         <h1 className="title">
           <span>Pixel</span> <span className="title-accent">Piggies</span>
         </h1>
-        <p className="subtitle">Launch, match &amp; reveal!</p>
+        <p className="subtitle">Bring the lost herd home. 🐷💛</p>
       </div>
 
       <div className="char-cards">
@@ -78,6 +79,9 @@ export function MainMenu({ save, onPlay, onKingdom, onSanctuary, onSettings }: P
         <div className="row">
           <button className="btn btn--mint btn--block" onClick={onKingdom}>
             🏰 Kingdom
+          </button>
+          <button className="btn btn--ghost btn--block" onClick={onStory}>
+            📖 Story
           </button>
           <button className="btn btn--ghost btn--block" onClick={onSettings}>
             ⚙ Settings

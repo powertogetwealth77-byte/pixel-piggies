@@ -17,6 +17,9 @@ page.on('console', (m) => { if (m.type() === 'error') consoleErrors.push(m.text(
 page.on('pageerror', (e) => consoleErrors.push('pageerror: ' + e.message));
 
 await page.goto('http://localhost:5173/', { waitUntil: 'networkidle' });
+// A fresh save opens on the story cinematic — skip it to reach the menu.
+const skip = page.locator('.cine-skip');
+if (await skip.count()) { await skip.click(); await page.waitForTimeout(200); }
 await page.screenshot({ path: `${SHOT_DIR}/01-menu.png` });
 
 // --- Main menu ---

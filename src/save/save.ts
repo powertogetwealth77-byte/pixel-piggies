@@ -48,6 +48,8 @@ export interface SaveData {
   starRewarded: Partial<Record<string, boolean>>;
   /** Anti-grind: consecutive non-improving replays of the same level. */
   replay: { levelId: number; streak: number };
+  /** Story-layer flags. `introSeen` gates the one-time opening cinematic. */
+  story: { introSeen: boolean };
   settings: {
     muted: boolean;
     musicOff: boolean;
@@ -81,6 +83,7 @@ export function defaultSave(): SaveData {
     worldChests: {},
     starRewarded: {},
     replay: { levelId: 0, streak: 0 },
+    story: { introSeen: false },
     settings: {
       muted: false,
       musicOff: false,
@@ -214,6 +217,12 @@ export function loadSave(): SaveData {
       worldChests: { ...parsed.worldChests },
       starRewarded: { ...parsed.starRewarded },
       replay: parsed.replay ?? { levelId: 0, streak: 0 },
+      // Returning players who already have progress shouldn't be interrupted by
+      // the opening cinematic — treat a pre-story save as already-seen. New and
+      // first-run players (no progress) get the intro. It's replayable either way.
+      story: parsed.story ?? {
+        introSeen: (parsed.unlockedLevel ?? 1) > 1 || Object.keys(parsed.levels ?? {}).length > 0,
+      },
       settings: { ...defaultSave().settings, ...parsed.settings },
     };
     // Migrate pre-rescue-arc saves: mochiRescued implies rescued.mochi.

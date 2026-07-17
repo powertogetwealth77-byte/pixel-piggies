@@ -19,6 +19,9 @@ page.on('pageerror', (e) => consoleErrors.push('pageerror: ' + e.message));
 await page.goto('http://localhost:5173/', { waitUntil: 'networkidle' });
 await page.evaluate(() => localStorage.clear());
 await page.reload({ waitUntil: 'networkidle' });
+// A fresh save opens on the story cinematic — skip it to reach the menu.
+const introSkip = page.locator('.cine-skip');
+if (await introSkip.count()) { await introSkip.click(); await page.waitForTimeout(200); }
 await page.getByRole('button', { name: /play/i }).first().click();
 await page.waitForTimeout(300);
 

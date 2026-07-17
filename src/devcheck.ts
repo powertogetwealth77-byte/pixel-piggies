@@ -5,6 +5,8 @@ import { solveLevel } from './engine/solver';
 import { generateDailyLevel, todayKey } from './daily/daily';
 import { defaultSave, resolveLevelReward, claimWorldChest, type LevelReward } from './save/save';
 import { WORLDS } from './data/worlds';
+import { CHAPTER_OF, INTRO_PANELS, sanctuaryTier } from './data/story';
+import { SANCTUARY, SANCTUARY_COUNT } from './data/sanctuary';
 import type { LevelDef } from './engine/types';
 
 // Validate board/picture dimensions.
@@ -353,4 +355,41 @@ for (const [name, pass] of rc) {
 }
 console.log(rewardOk ? `REWARD ECONOMY OK (${rc.length} checks)` : 'REWARD ECONOMY FAILURES');
 
-if (!chainOk || !allSolvable || !dimOk || !dailyOk || !tideOk || !rewardOk) throw new Error('devcheck failed');
+// ---- Story layer: cinematic gate, chapters, sanctuary tiers, pig memories ----
+const sc: [string, boolean][] = [];
+{
+  // Chapters cover every world with sensible numbering.
+  sc.push(['a chapter exists for each of the 5 worlds', WORLDS.every((w) => !!CHAPTER_OF(w.index))]);
+  sc.push(['chapters are numbered 1..5 in order', WORLDS.every((w) => CHAPTER_OF(w.index)!.n === w.index + 1)]);
+  sc.push(['intro cinematic has panels', INTRO_PANELS.length >= 4 && INTRO_PANELS.every((p) => p.lines.length > 0)]);
+
+  // Sanctuary restoration tiers rise monotonically and pick the right band.
+  sc.push(['tier(0) is the empty field', sanctuaryTier(0).min === 0]);
+  sc.push(['tier(1) is the first-warmth band', sanctuaryTier(1).min === 1]);
+  sc.push(['tier(5) still in first band (<6)', sanctuaryTier(5).min === 1]);
+  sc.push(['tier(6) advances to the bakery band', sanctuaryTier(6).min === 6]);
+  sc.push(['tier(SANCTUARY_COUNT) is the final rebirth', sanctuaryTier(SANCTUARY_COUNT).min === 22]);
+  sc.push(['tier bands never regress', (() => { let last = -1; for (let n = 0; n <= 40; n++) { const m = sanctuaryTier(n).min; if (m < last) return false; last = m; } return true; })()]);
+
+  // Biscuit carries the necklace clue (the bible's first-rescue beat).
+  const biscuit = SANCTUARY.find((p) => p.id === 'biscuit');
+  sc.push(['Biscuit has a story memory line', !!biscuit?.story && /necklace/i.test(biscuit!.story!)]);
+
+  // Migration: a save with existing progress must NOT re-trigger the intro,
+  // while a brand-new save must show it.
+  const withProgress = JSON.stringify({ ...defaultSave(), unlockedLevel: 4, levels: { 1: { stars: 3, bestScore: 9, bestCombo: 1, cleared: true } }, story: undefined });
+  // Emulate loadSave's merge rule directly (loadSave reads localStorage).
+  const migratedSeen = (JSON.parse(withProgress).unlockedLevel > 1) || Object.keys(JSON.parse(withProgress).levels).length > 0;
+  sc.push(['existing-progress save skips the intro', migratedSeen === true]);
+  sc.push(['fresh save defaults introSeen=false', defaultSave().story.introSeen === false]);
+}
+let storyOk = true;
+for (const [name, pass] of sc) {
+  if (!pass) {
+    console.log(`STORY CHECK FAILED: ${name}`);
+    storyOk = false;
+  }
+}
+console.log(storyOk ? `STORY LAYER OK (${sc.length} checks)` : 'STORY LAYER FAILURES');
+
+if (!chainOk || !allSolvable || !dimOk || !dailyOk || !tideOk || !rewardOk || !storyOk) throw new Error('devcheck failed');

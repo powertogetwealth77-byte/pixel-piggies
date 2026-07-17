@@ -1,6 +1,7 @@
 import { useEffect } from 'react';
 import { LEVELS } from '../../data/levels';
 import { WORLDS, worldStats, LEVEL_TITLE, type WorldDef } from '../../data/worlds';
+import { CHAPTER_OF } from '../../data/story';
 import { claimWorldChest, type SaveData } from '../../save/save';
 import { todayKey, DAILY_PIGMENT } from '../../daily/daily';
 import { audio } from '../../audio/audio';
@@ -79,17 +80,21 @@ export function LevelSelect({ save, onBack, onKingdom, onSanctuary, onSelect, on
       <div className="world-map">
         {WORLDS.map((world) => {
           const st = worldStats(save, world);
+          const chapter = CHAPTER_OF(world.index);
           // A world is reachable once its first level is unlocked.
           const worldLocked = world.first > unlocked;
           return (
             <section key={world.index} className={`world world--${world.theme} ${worldLocked ? 'world--locked' : ''}`}>
               <div className="world-head">
                 <div className="world-title">
+                  {chapter && <span className="chapter-eyebrow">Chapter {chapter.n} · {chapter.title}</span>}
                   <h3>{world.name}</h3>
                   <small>{worldLocked ? 'Complete the previous world to unlock' : world.subtitle}</small>
                 </div>
                 <span className="world-stars">⭐ {st.stars}/{st.maxStars}</span>
               </div>
+
+              {chapter && !worldLocked && <p className="chapter-beat">{chapter.beat}</p>}
 
               <div className="world-progress">
                 <div className="world-progress-fill" style={{ width: `${(st.cleared / st.total) * 100}%` }} />

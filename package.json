@@ -13,7 +13,8 @@
     "test:e2e": "node scripts/e2e/e2e.mjs",
     "test:campaign": "node scripts/e2e/campaign.mjs",
     "test:tide": "node scripts/e2e/tide.mjs",
-    "test:world": "node scripts/e2e/world.mjs"
+    "test:world": "node scripts/e2e/world.mjs",
+    "test:story": "node scripts/e2e/story.mjs"
   },
   "dependencies": {
     "react": "^18.3.1",
