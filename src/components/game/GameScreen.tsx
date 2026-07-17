@@ -1,14 +1,14 @@
 import { useCallback, useEffect, useRef, useState } from 'react';
 import { useEngine } from '../../hooks/useEngine';
 import type { LevelDef } from '../../engine/types';
-import type { LevelReward, SaveData } from '../../save/save';
+import type { LevelReward, RewardSummary, SaveData } from '../../save/save';
 import { audio, vibrate } from '../../audio/audio';
 import { PICTURE_CHAR } from '../../data/palette';
 import { PIGGIES } from '../../data/piggies';
 import { LEVELS } from '../../data/levels';
 import { ITEMS } from '../../data/items';
 import { telemetry } from '../../telemetry/telemetry';
-import { buyItem, itemAvailable, useItem } from '../../save/save';
+import { buyItem, itemAvailable, useItem, nextRescueTarget } from '../../save/save';
 import type { ItemId } from '../../engine/types';
 import { Board } from './Board';
 import { Pens } from './Pens';
@@ -20,11 +20,12 @@ import { PiggyAvatar } from '../ui/PiggyAvatar';
 interface Props {
   level: LevelDef;
   save: SaveData;
-  onComplete: (reward: LevelReward) => void;
+  onComplete: (reward: LevelReward) => RewardSummary;
   onExit: (levelId: number) => void;
   onQuit: () => void;
   onRestart: () => void;
   onKingdom: () => void;
+  onSanctuary: () => void;
   onUpdateSave: (s: SaveData) => void;
   onToast: (msg: string) => void;
 }
@@ -40,7 +41,7 @@ const PRAISE = [
 
 export type PenMood = 'idle' | 'sad' | 'happy' | 'wow';
 
-export function GameScreen({ level, save, onComplete, onExit, onQuit, onRestart, onKingdom, onUpdateSave, onToast }: Props) {
+export function GameScreen({ level, save, onComplete, onExit, onQuit, onRestart, onKingdom, onSanctuary, onUpdateSave, onToast }: Props) {
   const fxMode = save.settings.reducedMotion ? 'off' : save.settings.lowEffects ? 'reduced' : 'full';
   const { engine, snapshot: snap } = useEngine(level);
   const [shakeClass, setShakeClass] = useState('');
@@ -69,6 +70,7 @@ export function GameScreen({ level, save, onComplete, onExit, onQuit, onRestart,
   const [result, setResult] = useState<null | {
     won: boolean;
     reward: LevelReward;
+    summary?: RewardSummary;
     lossReason?: 'overflow' | 'ammo' | 'tide';
   }>(null);
 
@@ -222,12 +224,17 @@ export function GameScreen({ level, save, onComplete, onExit, onQuit, onRestart,
         coins,
         pigment: level.pigment,
       };
-      onComplete(reward);
+      const summary = onComplete(reward);
       audio.finalRelease(); // powerful final-pixel release
       vibrate([60, 40, 80, 40, 120]);
+      // Layered reward SFX (each respects the sound setting internally).
+      window.setTimeout(() => audio.coinCascade(), 260);
+      if (summary.newHighScore) window.setTimeout(() => audio.highScoreChime(), 420);
+      if (summary.newStarTokens > 0) window.setTimeout(() => audio.starPing(), 620);
+      if (summary.treasureCoins > 0) window.setTimeout(() => audio.chestOpen(), 800);
       telemetry.levelEnd(level.id, true, snap.elapsedMs, snap.bestCombo);
       if (level.id === 1) telemetry.tutorialDone();
-      setResult({ won: true, reward });
+      setResult({ won: true, reward, summary });
     } else if (snap.phase === 'lost') {
       completedRef.current = true;
       audio.lose();
@@ -497,6 +504,11 @@ export function GameScreen({ level, save, onComplete, onExit, onQuit, onRestart,
           level={level}
           result={result}
           teaser={result.won ? rescueTeaser(level.id, save) : undefined}
+          sanctuary={result.won ? nextRescueTarget(save) : null}
+          onSanctuary={() => {
+            telemetry.log('sanctuary_cta_clicked');
+            onSanctuary();
+          }}
           continueOffer={
             !result.won && result.lossReason === 'tide'
               ? {
@@ -540,24 +552,60 @@ interface ContinueOffer {
   onContinue: () => void;
 }
 
+/** Compact reward breakdown shown after a level (fast, < 1.5s stagger-in). */
+function RewardBreakdown({ summary: s }: { summary: RewardSummary }) {
+  const rows: { label: string; value: string }[] = [];
+  if (s.firstClear) {
+    if (s.baseCoins) rows.push({ label: 'Level cleared', value: `🪙 ${s.baseCoins}` });
+    if (s.pigment) rows.push({ label: 'Pigment', value: `🎨 ${s.pigment}` });
+  } else {
+    rows.push({ label: s.antiGrind ? 'Replay (rested)' : 'Replay', value: `🪙 ${s.baseCoins}` });
+    if (s.scoreBonus) rows.push({ label: 'Score bonus', value: `🪙 ${s.scoreBonus}` });
+    if (s.highScoreBonus) rows.push({ label: 'New high score', value: `🪙 ${s.highScoreBonus}` });
+    if (s.treasureCoins) rows.push({ label: '🎁 Treasure chest', value: `🪙 ${s.treasureCoins}` });
+  }
+  if (s.newStarTokens) rows.push({ label: 'New star', value: `🎟️ ${s.newStarTokens}` });
+  return (
+    <div className="reward-breakdown">
+      {rows.map((r, i) => (
+        <div key={i} className="rb-row" style={{ animationDelay: `${i * 0.09}s` }}>
+          <span>{r.label}</span>
+          <b>{r.value}</b>
+        </div>
+      ))}
+      <div className="rb-total">
+        <span>Earned</span>
+        <b>
+          🪙 {s.totalCoins}
+          {s.totalTokens > 0 && <> · 🎟️ {s.totalTokens}</>}
+        </b>
+      </div>
+    </div>
+  );
+}
+
 function ResultDialog({
   level,
   result,
   teaser,
+  sanctuary,
+  onSanctuary,
   continueOffer,
   onKingdom,
   onNext,
   onRetry,
 }: {
   level: LevelDef;
-  result: { won: boolean; reward: LevelReward; lossReason?: 'overflow' | 'ammo' | 'tide' };
+  result: { won: boolean; reward: LevelReward; summary?: RewardSummary; lossReason?: 'overflow' | 'ammo' | 'tide' };
   teaser?: string;
+  sanctuary?: ReturnType<typeof nextRescueTarget>;
+  onSanctuary?: () => void;
   continueOffer?: ContinueOffer;
   onKingdom?: () => void;
   onNext: () => void;
   onRetry: () => void;
 }) {
-  const { won, reward } = result;
+  const { won, reward, summary } = result;
   const width = level.picture[0].length;
 
   if (!won) {
@@ -626,13 +674,32 @@ function ResultDialog({
             }),
           )}
         </div>
-        <p style={{ fontWeight: 900, margin: 0 }}>You revealed the {level.pictureName}!</p>
+        {summary && <p className="reward-phrase">{summary.phrase}</p>}
+        {summary?.newHighScore && <p className="reward-highscore">🏆 NEW HIGH SCORE!</p>}
         <div className="reward-row">
           <span>🏆 {reward.score.toLocaleString()}</span>
           <span>⚡ {reward.bestCombo}</span>
-          <span>🪙 {reward.coins}</span>
-          <span>🎨 {reward.pigment}</span>
         </div>
+
+        {summary && <RewardBreakdown summary={summary} />}
+
+        {sanctuary && (
+          <div className="sanctuary-cta">
+            {sanctuary.ready ? (
+              <p>🐷 A piggy is ready to be rescued!</p>
+            ) : (
+              <p>
+                {sanctuary.need} more {sanctuary.currency} to rescue {sanctuary.pig.name}.
+              </p>
+            )}
+            {onSanctuary && (
+              <button className="btn btn--coral" style={{ minHeight: 40, padding: '8px 16px' }} onClick={onSanctuary}>
+                🏡 Sanctuary
+              </button>
+            )}
+          </div>
+        )}
+
         {teaser && <p className="rescue-teaser">{teaser}</p>}
         <button className="btn btn--primary btn--block" onClick={onNext}>
           Continue →

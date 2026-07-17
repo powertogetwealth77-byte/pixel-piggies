@@ -3,6 +3,8 @@ import { solveAll } from './engine/solver';
 import { GameEngine } from './engine/engine';
 import { solveLevel } from './engine/solver';
 import { generateDailyLevel, todayKey } from './daily/daily';
+import { defaultSave, resolveLevelReward, claimWorldChest, type LevelReward } from './save/save';
+import { WORLDS } from './data/worlds';
 import type { LevelDef } from './engine/types';
 
 // Validate board/picture dimensions.
@@ -233,4 +235,122 @@ for (const [name, pass] of tideChecks) {
 }
 console.log(tideOk ? `GLITCH TIDE OK (${tideChecks.length} checks)` : 'GLITCH TIDE FAILURES');
 
-if (!chainOk || !allSolvable || !dimOk || !dailyOk || !tideOk) throw new Error('devcheck failed');
+// --- Replay reward economy + world chest unit checks --------------------
+const rc: [string, boolean][] = [];
+const R = (levelId: number, stars: number, score: number): LevelReward => ({
+  levelId,
+  stars,
+  score,
+  bestCombo: 10,
+  coins: 100,
+  pigment: 12,
+});
+const seq = (vals: number[]) => {
+  let i = 0;
+  return () => vals[i++ % vals.length];
+};
+
+// 1. First clear: existing coins/pigment/token logic + stars marked.
+{
+  const { next, summary } = resolveLevelReward(defaultSave(), R(1, 2, 1500), 3, () => 0.99);
+  rc.push(['first-clear coins', next.coins === 100]);
+  rc.push(['first-clear tokens', next.rescueTokens === 3]); // 1 + (2-1) + 1
+  rc.push(['first-clear pigment', next.pigment === 12]);
+  rc.push(['first-clear marks stars', !!next.starRewarded['1:1'] && !!next.starRewarded['1:2']]);
+  rc.push(['first-clear unlocks next', next.unlockedLevel === 2]);
+  rc.push(['first-clear no anti-grind', summary.antiGrind === false]);
+}
+
+// 2. Replay base + score bonus (no high score), capped at 25.
+{
+  const s = defaultSave();
+  s.levels[1] = { stars: 3, bestScore: 999999, bestCombo: 50, cleared: true };
+  s.starRewarded = { '1:1': true, '1:2': true, '1:3': true };
+  const a = resolveLevelReward(s, R(1, 1, 5000), 3, () => 0.99);
+  rc.push(['replay base+score = 15', a.summary.totalCoins === 15]);
+  rc.push(['replay grants no pigment', a.next.pigment === 0]);
+  const b = resolveLevelReward(s, R(1, 1, 50000), 3, () => 0.99);
+  rc.push(['replay capped at 25', b.summary.totalCoins === 25]);
+}
+
+// 3. New high score = +15 once.
+{
+  const s = defaultSave();
+  s.levels[1] = { stars: 1, bestScore: 500, bestCombo: 10, cleared: true };
+  s.starRewarded = { '1:1': true };
+  const { summary } = resolveLevelReward(s, R(1, 1, 3000), 3, () => 0.99);
+  rc.push(['high-score bonus', summary.newHighScore && summary.totalCoins === 28]); // 10+3+15
+}
+
+// 4. New-star token granted once, never twice.
+{
+  const s = defaultSave();
+  s.levels[1] = { stars: 1, bestScore: 100, bestCombo: 10, cleared: true };
+  s.starRewarded = { '1:1': true };
+  const a = resolveLevelReward(s, R(1, 2, 50), 3, () => 0.99);
+  rc.push(['new-star token', a.summary.newStarTokens === 1 && a.next.rescueTokens === 1]);
+  const b = resolveLevelReward(a.next, R(1, 2, 50), 3, () => 0.99);
+  rc.push(['no double star token', b.summary.newStarTokens === 0]);
+}
+
+// 5. Perfect-clear treasure: deterministic via injected rng.
+{
+  const s = defaultSave();
+  s.levels[1] = { stars: 3, bestScore: 999999, bestCombo: 10, cleared: true };
+  s.starRewarded = { '1:1': true, '1:2': true, '1:3': true };
+  const hit = resolveLevelReward(s, R(1, 3, 5000), 3, seq([0.9, 0.1, 0.5]));
+  rc.push(['treasure granted', hit.summary.treasureCoins === 35]); // 20 + floor(0.5*31)
+  const miss = resolveLevelReward(s, R(1, 3, 5000), 3, seq([0.9, 0.5]));
+  rc.push(['treasure skipped', miss.summary.treasureCoins === 0]);
+}
+
+// 6. Anti-grind reduces base after repeated non-improving replays, then resets.
+{
+  let s = defaultSave();
+  s.levels[1] = { stars: 3, bestScore: 999999, bestCombo: 10, cleared: true };
+  s.starRewarded = { '1:1': true, '1:2': true, '1:3': true };
+  const bases: number[] = [];
+  for (let i = 0; i < 6; i++) {
+    const { next, summary } = resolveLevelReward(s, R(1, 1, 100), 3, () => 0.99);
+    bases.push(summary.baseCoins);
+    s = next;
+  }
+  rc.push(['anti-grind kicks in', bases[0] === 10 && bases[5] === 5]);
+  s.levels[2] = { stars: 0, bestScore: 0, bestCombo: 0, cleared: false };
+  const diff = resolveLevelReward(s, R(2, 1, 100), 3, () => 0.99).next;
+  const back = resolveLevelReward(diff, R(1, 1, 100), 3, () => 0.99).summary;
+  rc.push(['anti-grind resets after other level', back.baseCoins === 10]);
+}
+
+// 7. World chest: claim once, only when complete.
+{
+  const s = defaultSave();
+  for (let i = 1; i <= 6; i++) s.levels[i] = { stars: 2, bestScore: 100, bestCombo: 0, cleared: true };
+  const w = WORLDS[0];
+  const c1 = claimWorldChest(s, w);
+  rc.push(['world chest pays out', !!c1 && c1.coins === 150 && c1.rescueTokens === 1 && c1.worldChests[0] === true]);
+  rc.push(['world chest once', claimWorldChest(c1!, w) === null]);
+  const s2 = defaultSave();
+  s2.levels[1] = { stars: 2, bestScore: 100, bestCombo: 0, cleared: true };
+  rc.push(['world chest needs full world', claimWorldChest(s2, w) === null]);
+}
+
+// 8. Migration intent: stars already owned never re-award a token on replay.
+{
+  const s = defaultSave();
+  s.levels[1] = { stars: 2, bestScore: 100, bestCombo: 0, cleared: true };
+  s.starRewarded = { '1:1': true, '1:2': true };
+  const { summary } = resolveLevelReward(s, R(1, 2, 50), 3, () => 0.99);
+  rc.push(['no token for owned stars', summary.newStarTokens === 0]);
+}
+
+let rewardOk = true;
+for (const [name, pass] of rc) {
+  if (!pass) {
+    console.log(`REWARD CHECK FAILED: ${name}`);
+    rewardOk = false;
+  }
+}
+console.log(rewardOk ? `REWARD ECONOMY OK (${rc.length} checks)` : 'REWARD ECONOMY FAILURES');
+
+if (!chainOk || !allSolvable || !dimOk || !dailyOk || !tideOk || !rewardOk) throw new Error('devcheck failed');

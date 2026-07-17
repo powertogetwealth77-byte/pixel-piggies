@@ -27,7 +27,7 @@ await page.waitForTimeout(300);
 await page.screenshot({ path: `${SHOT_DIR}/02-levels.png` });
 
 // --- Level select: open level 1 ---
-const lvl1 = page.locator('button, [role=button]').filter({ hasText: /^1\b|First Squeal/ }).first();
+const lvl1 = page.locator('.node').first();
 await lvl1.click();
 await page.waitForTimeout(600);
 await page.screenshot({ path: `${SHOT_DIR}/03-game-start.png` });
@@ -140,7 +140,7 @@ else fail('save not persisted correctly: ' + JSON.stringify(save));
 await page.screenshot({ path: `${SHOT_DIR}/06-after-win.png` });
 
 // --- Pause / resume / restart on level 2 ---
-const lvl2 = page.locator('button, [role=button]').filter({ hasText: /Twin Bloom|^2\b/ }).first();
+const lvl2 = page.locator('.node').nth(1);
 await lvl2.click();
 await page.waitForFunction(() => window.__engine && window.__engine.getSnapshot().phase === 'playing', null, { timeout: 5000 });
 // Fire one shot (any pen, lane 0) so shotsFired > 0, to prove restart resets state.

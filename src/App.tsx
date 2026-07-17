@@ -2,11 +2,12 @@ import { useCallback, useEffect, useMemo, useRef, useState } from 'react';
 import { LEVELS } from './data/levels';
 import { audio, setHaptics } from './audio/audio';
 import {
-  applyLevelResult,
+  resolveLevelReward,
   loadSave,
   persist,
   resetSave,
   type LevelReward,
+  type RewardSummary,
   type SaveData,
 } from './save/save';
 import { telemetry } from './telemetry/telemetry';
@@ -67,16 +68,22 @@ export function App() {
   }, []);
 
   const handleLevelComplete = useCallback(
-    (reward: LevelReward) => {
+    (reward: LevelReward): RewardSummary => {
       const wasFirstClear = !save.levels[reward.levelId]?.cleared;
-      const next = applyLevelResult(save, reward);
+      const { next, summary } = resolveLevelReward(save, reward);
       update(next);
+      telemetry.log(wasFirstClear ? 'level_completed' : 'level_replayed');
+      if (!wasFirstClear) telemetry.log('replay_reward_earned');
+      if (summary.newHighScore) telemetry.log('high_score_improved');
+      if (summary.newStarTokens > 0) telemetry.log('new_star_earned');
+      if (summary.treasureCoins > 0) telemetry.log('treasure_chest_awarded');
       // Queue the rescue story after first clearing a rescue milestone.
       const hero = LEVELS.find((l) => l.id === reward.levelId)?.rescue;
       if (hero && wasFirstClear && !save.rescued[hero]) {
         pendingRescue.current = hero;
         telemetry.rescue(hero);
       }
+      return summary;
     },
     [save, update],
   );
@@ -85,8 +92,23 @@ export function App() {
   const dailyLevel = useMemo(() => generateDailyLevel(todayKey()), []);
 
   const handleDailyComplete = useCallback(
-    (reward: LevelReward) => {
-      if (!reward.stars) return; // losses can be retried the same day
+    (reward: LevelReward): RewardSummary => {
+      const blank: RewardSummary = {
+        firstClear: true,
+        baseCoins: 0,
+        scoreBonus: 0,
+        highScoreBonus: 0,
+        newStarTokens: 0,
+        treasureCoins: 0,
+        pigment: 0,
+        totalCoins: 0,
+        totalTokens: 0,
+        newHighScore: false,
+        perfect: false,
+        antiGrind: false,
+        phrase: 'THE SANCTUARY GROWS!',
+      };
+      if (!reward.stars) return blank; // losses can be retried the same day
       const next: SaveData = {
         ...save,
         coins: save.coins + reward.coins,
@@ -96,6 +118,13 @@ export function App() {
       };
       update(next);
       telemetry.dailyDone();
+      return {
+        ...blank,
+        baseCoins: reward.coins,
+        pigment: dailyLevel.pigment,
+        totalCoins: reward.coins,
+        totalTokens: 3,
+      };
     },
     [save, update, dailyLevel],
   );
@@ -142,6 +171,8 @@ export function App() {
           onSanctuary={() => go({ name: 'sanctuary' })}
           onSelect={(id) => go({ name: 'game', levelId: id })}
           onDaily={() => go({ name: 'daily' })}
+          onUpdate={update}
+          onToast={showToast}
         />
       )}
 
@@ -168,6 +199,7 @@ export function App() {
             )
           }
           onKingdom={() => go({ name: 'kingdom' })}
+          onSanctuary={() => go({ name: 'sanctuary' })}
           onUpdateSave={update}
           onToast={showToast}
         />
@@ -187,6 +219,7 @@ export function App() {
             )
           }
           onKingdom={() => go({ name: 'kingdom' })}
+          onSanctuary={() => go({ name: 'sanctuary' })}
           onUpdateSave={update}
           onToast={showToast}
         />

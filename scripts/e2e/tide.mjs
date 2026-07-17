@@ -39,7 +39,7 @@ await page.reload({ waitUntil: 'networkidle' });
 async function openLevel(id) {
   await page.getByRole('button', { name: /play/i }).first().click().catch(() => {});
   await page.waitForTimeout(300);
-  await page.locator('.level-tile').nth(id - 1).click();
+  await page.locator('.node').nth(id - 1).click();
   await page.waitForFunction(
     (want) => window.__engine && window.__engine.getSnapshot().level.id === want && window.__engine.getSnapshot().phase === 'playing',
     id,

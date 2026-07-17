@@ -42,6 +42,12 @@ export interface SaveData {
   items: Partial<Record<ItemId, number>>;
   /** How many free introductory uses of each item have been spent. */
   freeUsed: Partial<Record<ItemId, number>>;
+  /** World reward chests already claimed (keyed by world index 0-4). */
+  worldChests: Partial<Record<number, boolean>>;
+  /** One-time new-star token grants, keyed "levelId:starNumber". */
+  starRewarded: Partial<Record<string, boolean>>;
+  /** Anti-grind: consecutive non-improving replays of the same level. */
+  replay: { levelId: number; streak: number };
   settings: {
     muted: boolean;
     musicOff: boolean;
@@ -72,6 +78,9 @@ export function defaultSave(): SaveData {
     dailyDone: null,
     items: {},
     freeUsed: {},
+    worldChests: {},
+    starRewarded: {},
+    replay: { levelId: 0, streak: 0 },
     settings: {
       muted: false,
       musicOff: false,
@@ -130,6 +139,53 @@ export function freePig(save: SaveData, pig: CaptivePig): SaveData | null {
   return next;
 }
 
+/**
+ * Claim a world's reward chest exactly once. The caller passes the world's
+ * span + reward; this verifies all six levels are cleared and not-yet-claimed.
+ */
+export function claimWorldChest(
+  save: SaveData,
+  world: { index: number; first: number; last: number; chest: { coins: number; tokens: number } },
+): SaveData | null {
+  if (save.worldChests[world.index]) return null; // already claimed
+  for (let id = world.first; id <= world.last; id++) {
+    if (!save.levels[id]?.cleared) return null; // world not complete
+  }
+  const next = structuredCloneSafe(save);
+  next.worldChests[world.index] = true;
+  next.coins += world.chest.coins;
+  next.rescueTokens += world.chest.tokens;
+  return next;
+}
+
+/** The next Sanctuary piggy to aim for, and whether it's affordable now. */
+export function nextRescueTarget(
+  save: SaveData,
+): { pig: CaptivePig; ready: boolean; need: number; currency: 'coins' | 'tokens' } | null {
+  const unfreed = SANCTUARY.filter((p) => !save.freedPigs[p.id]);
+  if (unfreed.length === 0) return null;
+  // Affordable right now? Prefer the cheapest affordable.
+  const affordable = unfreed
+    .filter((p) => canAffordPig(save, p))
+    .sort((a, b) => cost(a) - cost(b));
+  if (affordable.length) {
+    const pig = affordable[0];
+    return { pig, ready: true, need: 0, currency: pig.cost.tokens != null ? 'tokens' : 'coins' };
+  }
+  // Otherwise the closest coin-pig by coins still needed (fall back to token-pig).
+  const coinPigs = unfreed.filter((p) => p.cost.coins != null);
+  const pool = coinPigs.length ? coinPigs : unfreed;
+  const pig = pool.sort((a, b) => cost(a) - cost(b))[0];
+  if (pig.cost.tokens != null) {
+    return { pig, ready: false, need: pig.cost.tokens - save.rescueTokens, currency: 'tokens' };
+  }
+  return { pig, ready: false, need: (pig.cost.coins ?? 0) - save.coins, currency: 'coins' };
+}
+
+function cost(p: CaptivePig): number {
+  return p.cost.coins ?? (p.cost.tokens ?? 0) * 100; // token pigs rank after coin pigs
+}
+
 /** Buy one item with coins. Returns updated save, or null if unaffordable. */
 export function buyItem(save: SaveData, id: ItemId): SaveData | null {
   const price = ITEMS[id].price;
@@ -155,10 +211,20 @@ export function loadSave(): SaveData {
       items: { ...parsed.items },
       freeUsed: { ...parsed.freeUsed },
       freedPigs: { ...parsed.freedPigs },
+      worldChests: { ...parsed.worldChests },
+      starRewarded: { ...parsed.starRewarded },
+      replay: parsed.replay ?? { levelId: 0, streak: 0 },
       settings: { ...defaultSave().settings, ...parsed.settings },
     };
     // Migrate pre-rescue-arc saves: mochiRescued implies rescued.mochi.
     if (merged.mochiRescued) merged.rescued.mochi = true;
+    // Migrate pre-star-token saves: mark already-owned stars as rewarded so
+    // replays never retroactively grant tokens for stars the player already had.
+    for (const [id, prog] of Object.entries(merged.levels)) {
+      for (let n = 1; n <= (prog?.stars ?? 0); n++) {
+        merged.starRewarded[`${id}:${n}`] ??= true;
+      }
+    }
     return merged;
   } catch {
     return defaultSave();
@@ -184,44 +250,161 @@ export interface LevelReward {
   stars: number;
   score: number;
   bestCombo: number;
-  coins: number;
+  coins: number; // engine's first-clear coin value
   pigment: number;
 }
 
-/** Apply the result of a completed level and return the updated save. */
-export function applyLevelResult(prev: SaveData, reward: LevelReward): SaveData {
+/** All star ratings top out at 3; a "perfect" clear earns all 3. */
+export const MAX_LEVEL_STARS = 3;
+
+export const REWARD_PHRASES = [
+  'OINKREDIBLE!',
+  'SNOUTSTANDING!',
+  'PIG-TASTIC!',
+  'NEW PIGGY BEST!',
+  "THAT'LL SHOW THE WOLVES!",
+  'THE SANCTUARY GROWS!',
+];
+
+/** Compact, refresh-safe breakdown of what a level clear awarded. */
+export interface RewardSummary {
+  firstClear: boolean;
+  baseCoins: number; // first-clear coin value, or replay base
+  scoreBonus: number; // replay score bonus (post-cap)
+  highScoreBonus: number;
+  newStarTokens: number;
+  treasureCoins: number;
+  pigment: number;
+  totalCoins: number;
+  totalTokens: number;
+  newHighScore: boolean;
+  perfect: boolean;
+  antiGrind: boolean; // base was reduced by the anti-grind rule
+  phrase: string;
+}
+
+/**
+ * Resolve a level clear into an updated save AND a reward summary, applying
+ * all rewards atomically so a page refresh can never re-grant them. Handles
+ * both the first clear (existing rewards + hero rescue) and the replay economy
+ * (base coins, score/high-score bonuses, one-time new-star tokens, perfect
+ * treasure chest, and anti-grind reduction).
+ *
+ * `rng` is injectable so tests are deterministic.
+ */
+export function resolveLevelReward(
+  prev: SaveData,
+  reward: LevelReward,
+  maxStars = MAX_LEVEL_STARS,
+  rng: () => number = Math.random,
+): { next: SaveData; summary: RewardSummary } {
   const next: SaveData = structuredCloneSafe(prev);
   const existing = next.levels[reward.levelId];
   const firstClear = !existing?.cleared;
-  const bestStars = Math.max(existing?.stars ?? 0, reward.stars);
-  const bestScore = Math.max(existing?.bestScore ?? 0, reward.score);
-  const bestCombo = Math.max(existing?.bestCombo ?? 0, reward.bestCombo);
-  next.levels[reward.levelId] = { stars: bestStars, bestScore, bestCombo, cleared: true };
+  const prevStars = existing?.stars ?? 0;
+  const prevScore = existing?.bestScore ?? 0;
 
-  next.coins += reward.coins;
-  // Rescue Tokens flow every clear (more for a better result), so there's
-  // always fuel to free the next Sanctuary piggy: 1 + one per star above the first.
-  next.rescueTokens += 1 + Math.max(0, reward.stars - 1);
-  // Pigment only granted on the first clear of a level (progression currency).
+  const summary: RewardSummary = {
+    firstClear,
+    baseCoins: 0,
+    scoreBonus: 0,
+    highScoreBonus: 0,
+    newStarTokens: 0,
+    treasureCoins: 0,
+    pigment: 0,
+    totalCoins: 0,
+    totalTokens: 0,
+    newHighScore: false,
+    perfect: reward.stars >= maxStars,
+    antiGrind: false,
+    phrase: REWARD_PHRASES[Math.floor(rng() * REWARD_PHRASES.length)] ?? REWARD_PHRASES[0],
+  };
+
+  // Save best progress.
+  next.levels[reward.levelId] = {
+    stars: Math.max(prevStars, reward.stars),
+    bestScore: Math.max(prevScore, reward.score),
+    bestCombo: Math.max(existing?.bestCombo ?? 0, reward.bestCombo),
+    cleared: true,
+  };
+
+  let coins = 0;
+  let tokens = 0;
+
+  // Anti-grind tracker: completing ANY different level resets the streak.
+  if (next.replay.levelId !== reward.levelId) {
+    next.replay = { levelId: reward.levelId, streak: 0 };
+  }
+
   if (firstClear) {
+    // Keep the existing first-clear rewards and token logic.
+    coins += reward.coins;
+    tokens += 1 + Math.max(0, reward.stars - 1) + 1; // clear + per extra star + first-clear bonus
     next.pigment += reward.pigment;
-    next.rescueTokens += 1; // first-clear bonus token
-    // Rescue milestone: free the caged hero and grant their one-time reward.
+    summary.pigment = reward.pigment;
+    summary.baseCoins = reward.coins;
     const hero = LEVELS.find((l) => l.id === reward.levelId)?.rescue;
     if (hero && !next.rescued[hero]) {
       next.rescued[hero] = true;
       if (hero === 'mochi') next.mochiRescued = true;
       const arc = RESCUE_ARCS[hero];
-      next.coins += arc.reward.coins;
+      coins += arc.reward.coins;
       next.pigment += arc.reward.pigment;
+      summary.pigment += arc.reward.pigment;
+    }
+    // Mark every star earned on the first clear as rewarded (no double later).
+    for (let n = 1; n <= reward.stars; n++) next.starRewarded[`${reward.levelId}:${n}`] = true;
+  } else {
+    // --- Replay economy ---
+    const improved = reward.score > prevScore || reward.stars > prevStars;
+    // Anti-grind: count consecutive non-improving replays of the same level.
+    next.replay.streak = improved ? 0 : next.replay.streak + 1;
+    const base = next.replay.streak >= 5 ? 5 : 10;
+    summary.antiGrind = base === 5;
+    const rawScoreBonus = Math.min(15, Math.floor(reward.score / 1000));
+    const normal = Math.min(25, base + rawScoreBonus); // base+bonus capped at 25
+    summary.baseCoins = base;
+    summary.scoreBonus = normal - base;
+    coins += normal;
+
+    if (reward.score > prevScore) {
+      coins += 15;
+      summary.highScoreBonus = 15;
+      summary.newHighScore = true;
+    }
+
+    // One-time token for each newly earned star (never awarded twice).
+    for (let n = prevStars + 1; n <= reward.stars; n++) {
+      const key = `${reward.levelId}:${n}`;
+      if (!next.starRewarded[key]) {
+        next.starRewarded[key] = true;
+        tokens += 1;
+        summary.newStarTokens += 1;
+      }
+    }
+
+    // Perfect clear: 20% chance of a treasure chest (20-50 coins), granted
+    // and stored now so refreshing can't re-claim it.
+    if (reward.stars >= maxStars && rng() < 0.2) {
+      const t = 20 + Math.floor(rng() * 31);
+      coins += t;
+      summary.treasureCoins = t;
     }
   }
+
+  // New-star tokens can also occur when a first-clear is below max, then a
+  // later replay improves stars — handled above via the replay branch.
+
+  next.coins += coins;
+  next.rescueTokens += tokens;
+  summary.totalCoins = coins;
+  summary.totalTokens = tokens;
 
   // Unlock next level.
   if (reward.levelId >= next.unlockedLevel && reward.levelId < LEVEL_COUNT) {
     next.unlockedLevel = reward.levelId + 1;
   }
-  return next;
+  return { next, summary };
 }
 
 /** Spend pigment to restore part of the kingdom. Returns null if unaffordable. */

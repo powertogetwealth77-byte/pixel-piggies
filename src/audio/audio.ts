@@ -233,6 +233,31 @@ class AudioManager {
     this.tone(2093, 0.5, 'sine', 0.1, 0.4);
   }
 
+  // --- Replay reward SFX (all original) --------------------------------
+  /** Rising three-note chime for a new high score. */
+  highScoreChime() {
+    [659, 831, 988].forEach((f, i) => this.tone(f, 0.18, 'triangle', 0.22, i * 0.11));
+    this.tone(1319, 0.24, 'sine', 0.12, 0.34);
+  }
+
+  /** Sparkling ping for a newly earned star. */
+  starPing() {
+    this.tone(1568, 0.1, 'sine', 0.16, 0, 2093);
+    this.tone(2093, 0.14, 'triangle', 0.1, 0.05);
+  }
+
+  /** Short chest-opening flourish. */
+  chestOpen() {
+    this.tone(196, 0.14, 'sawtooth', 0.14, 0, 260); // creak
+    [784, 988, 1319, 1568].forEach((f, i) => this.tone(f, 0.16, 'triangle', 0.18, 0.12 + i * 0.05));
+    this.noise(0.18, 0.1);
+  }
+
+  /** Soft coin cascade for the reward total. */
+  coinCascade() {
+    for (let i = 0; i < 5; i++) this.tone(880 + i * 90, 0.07, 'square', 0.12, i * 0.055);
+  }
+
   spawn() {
     this.tone(660, 0.09, 'sine', 0.14, 0, 880);
   }

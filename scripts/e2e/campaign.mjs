@@ -24,7 +24,7 @@ await page.waitForTimeout(300);
 
 async function ensureLevelSelect() {
   for (let i = 0; i < 20; i++) {
-    if (await page.locator('.level-grid').count()) return true;
+    if (await page.locator('.world-map').count()) return true;
     if (await page.getByText(/Piggy Rescued/i).count()) {
       const btn = page.getByRole('button', { name: /continue/i });
       if (await btn.count()) await btn.click();
@@ -160,7 +160,7 @@ async function greedyPlayToWin() {
 const results = [];
 for (let id = 1; id <= 30; id++) {
   if (!(await ensureLevelSelect())) { fail(`could not reach level select before level ${id}`); break; }
-  const tile = page.locator('.level-tile').nth(id - 1);
+  const tile = page.locator('.node').nth(id - 1);
   if (await tile.isDisabled()) { fail(`level ${id} is locked when it should be unlocked`); break; }
   await tile.click();
   try {

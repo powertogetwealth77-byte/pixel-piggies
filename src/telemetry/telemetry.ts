@@ -41,6 +41,8 @@ export interface TelemetryData {
   postLossExits: number;
   sanctuaryVisits: number;
   pigsFreed: number;
+  /** Lightweight internal event counters (world map, replay economy, etc.). */
+  events: Partial<Record<string, number>>;
 }
 
 const KEY = 'pixel-piggies-telemetry-v1';
@@ -70,6 +72,7 @@ function blank(): TelemetryData {
     postLossExits: 0,
     sanctuaryVisits: 0,
     pigsFreed: 0,
+    events: {},
   };
 }
 
@@ -252,6 +255,12 @@ class Telemetry {
 
   pigFreed() {
     this.data.pigsFreed += 1;
+    this.persist();
+  }
+
+  /** Generic lightweight event logger (world_viewed, level_replayed, …). */
+  log(name: string) {
+    this.data.events[name] = (this.data.events[name] ?? 0) + 1;
     this.persist();
   }
 
