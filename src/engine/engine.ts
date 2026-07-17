@@ -2,6 +2,7 @@ import type {
   Block,
   ChainEvent,
   GameSnapshot,
+  ItemId,
   LaunchResult,
   LevelDef,
   LossReason,
@@ -9,12 +10,26 @@ import type {
   QueueEntry,
 } from './types';
 import { BLOCK_CHAR } from '../data/palette';
+import {
+  MAX_STRIKES,
+  TIDE_MAX,
+  tideConfigFor,
+  tideStage,
+  type TideConfig,
+} from './tide';
 
 export const LANES = 3;
 export const FEVER_MS = 10000;
 export const COMBO_TIMEOUT_MS = 3500;
 /** Delay between cascade stages so each pop reads as its own beat. */
 export const CHAIN_STAGE_MS = 420;
+
+// Active recovery: correct matches shorten the piggy return cooldown. These
+// only ever make piggies arrive *sooner*, so they never affect solvability.
+const COOLDOWN_REDUCE_PER_CLEAR = 180; // ms shaved per cleared block
+const COOLDOWN_REDUCE_CAP = 1200; // ms shaved per launch
+/** A chain of at least this many cleared blocks instantly recalls one piggy. */
+const CHAIN_RECALL_MIN = 3;
 
 let uid = 1;
 const nextId = () => uid++;
@@ -71,6 +86,17 @@ interface InternalState {
   lastChain: ChainEvent | null;
   /** Scheduled cascade check: cluster ids per block before the last pop. */
   pendingChain: { stage: number; delayMs: number; prevClusterOf: Map<number, number> } | null;
+  // --- The Glitch Tide ---
+  tide: number;
+  strikes: number;
+  tideFreezeMs: number; // remaining freeze (chain / freeze pop / grace)
+  lastStrikeId: number;
+  lastTimeRestored: number;
+}
+
+export interface EngineOptions {
+  /** Relaxed Mode: no Glitch Tide, no strikes (reduced bonus rewards). */
+  relaxed?: boolean;
 }
 
 export class GameEngine {
@@ -80,9 +106,13 @@ export class GameEngine {
   private s: InternalState;
   private listeners = new Set<() => void>();
   private snap: GameSnapshot;
+  private relaxed: boolean;
+  private tideCfg: TideConfig;
 
-  constructor(level: LevelDef) {
+  constructor(level: LevelDef, opts: EngineOptions = {}) {
     this.level = level;
+    this.relaxed = opts.relaxed ?? false;
+    this.tideCfg = tideConfigFor(level.id, this.relaxed);
     const board = parseBoard(level.blocks);
     this.height = board.length;
     this.width = board[0].length;
@@ -109,8 +139,24 @@ export class GameEngine {
       lossReason: null,
       lastChain: null,
       pendingChain: null,
+      tide: 0,
+      strikes: 0,
+      tideFreezeMs: 0,
+      lastStrikeId: 0,
+      lastTimeRestored: 0,
     };
     this.snap = this.build();
+  }
+
+  /** Toggle Relaxed Mode (test hook + in-level toggle). Recomputes Tide config. */
+  setRelaxed(relaxed: boolean) {
+    this.relaxed = relaxed;
+    this.tideCfg = tideConfigFor(this.level.id, relaxed);
+    if (relaxed) {
+      this.s.tide = 0;
+      this.s.tideFreezeMs = 0;
+    }
+    this.emit();
   }
 
   subscribe = (fn: () => void): (() => void) => {
@@ -157,7 +203,31 @@ export class GameEngine {
       elapsedMs: s.elapsedMs,
       closeCall: filledPens >= this.level.pens - 1 && s.queue.length > 0,
       lossReason: s.lossReason,
+      tideEnabled: this.tideCfg.enabled,
+      tide: s.tide,
+      tideStage: tideStage(s.tide),
+      tideFrozen: s.tideFreezeMs > 0 || s.feverActive,
+      strikes: s.strikes,
+      maxStrikes: MAX_STRIKES,
+      lastStrikeId: s.lastStrikeId,
+      relaxed: this.relaxed,
+      penRecharge: this.penRecharge(),
+      lastTimeRestored: s.lastTimeRestored,
     };
+  }
+
+  /** Per-pen recharge progress for the recharge rings (see types.penRecharge). */
+  private penRecharge(): number[] {
+    const s = this.s;
+    const firstEmpty = s.pens.findIndex((p) => p === null);
+    return s.pens.map((p, slot) => {
+      if (p) return 1; // occupied → ready
+      if (s.queue.length === 0) return -1; // nothing coming → no ring
+      if (slot === firstEmpty) {
+        return Math.max(0, Math.min(1, 1 - s.spawnTimer / this.level.spawnMs));
+      }
+      return 0; // queued behind, waiting its turn
+    });
   }
 
   private multiplier(): number {
@@ -234,6 +304,10 @@ export class GameEngine {
       if (s.pendingChain.delayMs <= 0) this.processChainStage();
     }
 
+    // The Glitch Tide. Only rises after the first move, when enabled, and
+    // never while frozen (chain / freeze pop / fever / post-strike grace).
+    this.advanceTide(dtMs);
+
     // Spawning (paused during fever for a satisfying breather).
     if (!s.feverActive && s.queue.length > 0) {
       s.spawnTimer -= dtMs;
@@ -271,6 +345,134 @@ export class GameEngine {
     }
   }
 
+  /** Advance the Glitch Tide meter for a tick (called from tick()). */
+  private advanceTide(dtMs: number) {
+    const s = this.s;
+    const cfg = this.tideCfg;
+
+    // Freeze countdown always ticks down (chain / freeze pop / grace).
+    if (s.tideFreezeMs > 0) s.tideFreezeMs = Math.max(0, s.tideFreezeMs - dtMs);
+
+    if (!cfg.enabled) return;
+    if (s.shotsFired === 0) return; // no pressure until the first move
+    if (s.feverActive) {
+      // Fever stops the Tide completely — gently drain it for relief.
+      s.tide = Math.max(0, s.tide - (dtMs / 1000) * cfg.risePerSec * 2);
+      return;
+    }
+    if (s.tideFreezeMs > 0) return; // frozen: no rise
+
+    const stageMult = s.tide >= 75 ? cfg.criticalMultiplier : 1;
+    s.tide += (dtMs / 1000) * cfg.risePerSec * stageMult;
+    if (s.tide >= TIDE_MAX) this.glitchStrike();
+  }
+
+  /** Issue a Glitch Strike: reset the meter, grant grace, lose on the third. */
+  private glitchStrike() {
+    const s = this.s;
+    s.strikes += 1;
+    s.lastStrikeId += 1;
+    s.tide = this.tideCfg.strikeResetLevel;
+    s.tideFreezeMs = Math.max(s.tideFreezeMs, this.tideCfg.strikeGraceMs);
+    if (s.strikes >= MAX_STRIKES) {
+      // The board and piggies are untouched — a solvable puzzle stays solvable.
+      s.phase = 'lost';
+      s.lossReason = 'tide';
+    }
+  }
+
+  /** Reduce the Tide (matches restore time; big clears push it back). */
+  private restoreTide(clearedCount: number) {
+    const cfg = this.tideCfg;
+    if (!cfg.enabled) {
+      this.s.lastTimeRestored = 0;
+      return;
+    }
+    let restore = Math.min(cfg.restoreCap, clearedCount * cfg.restorePerClear);
+    if (clearedCount >= cfg.bigClearThreshold) restore += cfg.bigClearPushback;
+    this.s.tide = Math.max(0, this.s.tide - restore);
+    this.s.lastTimeRestored = restore;
+  }
+
+  /** Active recovery: shorten the piggy return cooldown after a match. */
+  private shortenCooldown(clearedCount: number) {
+    const cut = Math.min(COOLDOWN_REDUCE_CAP, clearedCount * COOLDOWN_REDUCE_PER_CLEAR);
+    this.s.spawnTimer = Math.max(0, this.s.spawnTimer - cut);
+  }
+
+  /** Recall one piggy immediately if there's an empty pen (chains trigger this). */
+  private recallOne(): boolean {
+    const s = this.s;
+    if (s.queue.length === 0) return false;
+    const empty = s.pens.findIndex((p) => p === null);
+    if (empty === -1) return false;
+    s.pens[empty] = s.queue.shift()!;
+    s.spawnTimer = this.level.spawnMs;
+    return true;
+  }
+
+  /** Recall the whole team into every empty pen (Fever trigger). */
+  private recallTeam() {
+    const s = this.s;
+    for (let slot = 0; slot < s.pens.length; slot++) {
+      if (s.pens[slot] == null && s.queue.length > 0) s.pens[slot] = s.queue.shift()!;
+    }
+    s.spawnTimer = this.level.spawnMs;
+  }
+
+  /**
+   * Apply a recovery item mid-level. Items never touch the board, queue order,
+   * odds, or solvability — they only relieve time pressure or recall piggies.
+   * Returns false if the item can't act (e.g. no empty pen), so the caller can
+   * refund a free/paid use.
+   */
+  applyItem(id: ItemId): boolean {
+    if (this.s.phase !== 'playing') return false;
+    const s = this.s;
+    switch (id) {
+      case 'timeTreat':
+        if (!this.tideCfg.enabled) return false;
+        s.tide = Math.max(0, s.tide - 45);
+        s.lastTimeRestored = 45;
+        this.emit();
+        return true;
+      case 'freezePop':
+        if (!this.tideCfg.enabled) return false;
+        s.tideFreezeMs = Math.max(s.tideFreezeMs, 6000);
+        this.emit();
+        return true;
+      case 'piggyWhistle': {
+        const ok = this.recallOne();
+        if (ok) this.emit();
+        return ok;
+      }
+      case 'goldenPen': {
+        // Grant one wild prism launch by dropping a fresh prism into a pen.
+        const empty = s.pens.findIndex((p) => p === null);
+        if (empty === -1) return false;
+        s.pens[empty] = { id: nextId(), type: 'prism', color: 'coral', ammo: 1, maxAmmo: 1 };
+        s.prismUsed = false; // this golden prism is usable even if the level's was spent
+        this.emit();
+        return true;
+      }
+      case 'secondWind':
+        return this.secondWind();
+    }
+  }
+
+  /** Post-loss continue: revive with strikes wound back and the Tide calmed. */
+  secondWind(): boolean {
+    const s = this.s;
+    if (s.phase !== 'lost' || s.lossReason !== 'tide') return false;
+    s.phase = 'playing';
+    s.lossReason = null;
+    s.strikes = Math.max(0, s.strikes - 2); // give back two strikes
+    s.tide = 20;
+    s.tideFreezeMs = 1500;
+    this.emit();
+    return true;
+  }
+
   /** Launch the selected (or given) piggy into a lane. */
   launchLane(lane: number, slotOverride?: number) {
     if (this.s.phase !== 'playing') return;
@@ -281,6 +483,7 @@ export class GameEngine {
     // Prism is limited to one use per level.
     if (piggy.type === 'prism' && this.s.prismUsed) return;
 
+    const wasFever = this.s.feverActive;
     const result = this.resolveLaunch(piggy, lane);
 
     // Consume ammo / free the pen slot.
@@ -291,6 +494,16 @@ export class GameEngine {
       this.s.pens[slot] = null;
       if (this.s.selectedPen === slot) this.s.selectedPen = null;
     }
+
+    // Correct match: restore Tide time & shorten the return cooldown.
+    if (!result.fizzle && result.cleared.length > 0) {
+      this.restoreTide(result.cleared.length);
+      this.shortenCooldown(result.cleared.length);
+    } else {
+      this.s.lastTimeRestored = 0;
+    }
+    // Fever just ignited: recall the whole team and the Tide stops.
+    if (!wasFever && this.s.feverActive) this.recallTeam();
 
     this.s.lastLaunch = result;
     this.checkEnd();
@@ -418,6 +631,12 @@ export class GameEngine {
     const mult = this.multiplier();
     const gained = cleared.length * 12 * stage * mult;
     s.score += gained;
+
+    // A meaningful chain briefly freezes the Tide and recalls one piggy.
+    if (this.tideCfg.enabled) s.tideFreezeMs = Math.max(s.tideFreezeMs, this.tideCfg.chainFreezeMs);
+    if (cleared.length >= CHAIN_RECALL_MIN) this.recallOne();
+
+    const wasFever = s.feverActive;
     if (!s.feverActive) {
       s.fever = Math.min(100, s.fever + cleared.length * 5 * stage);
       if (s.fever >= 100) {
@@ -425,6 +644,7 @@ export class GameEngine {
         s.feverMsLeft = FEVER_MS;
       }
     }
+    if (!wasFever && s.feverActive) this.recallTeam();
 
     s.lastChain = {
       id: nextId(),
@@ -600,6 +820,13 @@ export class GameEngine {
   }
 
   coins(): number {
-    return Math.round(this.s.score / 25) + this.stars() * 20 + this.s.bestCombo * 2;
+    const base = Math.round(this.s.score / 25) + this.stars() * 20 + this.s.bestCombo * 2;
+    // Relaxed Mode trades the Tide's tension for a reduced coin payout.
+    return this.relaxed ? Math.round(base * 0.6) : base;
+  }
+
+  /** Whether this run earns reduced (Relaxed) rewards, surfaced to the UI. */
+  isRelaxed(): boolean {
+    return this.relaxed;
   }
 }

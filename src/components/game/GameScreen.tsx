@@ -57,7 +57,7 @@ export function GameScreen({ level, save, onComplete, onExit, onQuit, onRestart,
   const [result, setResult] = useState<null | {
     won: boolean;
     reward: LevelReward;
-    lossReason?: 'overflow' | 'ammo';
+    lossReason?: 'overflow' | 'ammo' | 'tide';
   }>(null);
 
   // Start engine + music; record the attempt locally.
@@ -383,7 +383,7 @@ function ResultDialog({
   onRetry,
 }: {
   level: LevelDef;
-  result: { won: boolean; reward: LevelReward; lossReason?: 'overflow' | 'ammo' };
+  result: { won: boolean; reward: LevelReward; lossReason?: 'overflow' | 'ammo' | 'tide' };
   teaser?: string;
   onKingdom?: () => void;
   onNext: () => void;

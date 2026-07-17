@@ -3,8 +3,8 @@ import { GameEngine } from '../engine/engine';
 import type { LevelDef } from '../engine/types';
 
 /** Create an engine for a level and drive its real-time tick loop. */
-export function useEngine(level: LevelDef) {
-  const engine = useMemo(() => new GameEngine(level), [level]);
+export function useEngine(level: LevelDef, relaxed = false) {
+  const engine = useMemo(() => new GameEngine(level, { relaxed }), [level, relaxed]);
   const snapshot = useSyncExternalStore(engine.subscribe, engine.getSnapshot);
   // Dev-only hook so automated tests can inspect and drive the live engine.
   if (import.meta.env.DEV) {

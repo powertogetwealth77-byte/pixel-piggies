@@ -58,7 +58,10 @@ export interface LevelDef {
 
 export type GamePhase = 'ready' | 'playing' | 'paused' | 'won' | 'lost';
 
-export type LossReason = 'overflow' | 'ammo';
+export type LossReason = 'overflow' | 'ammo' | 'tide';
+
+/** In-level recovery items the player can trigger. */
+export type ItemId = 'timeTreat' | 'piggyWhistle' | 'freezePop' | 'goldenPen' | 'secondWind';
 
 /** Transient visual info about the most recent launch, read by the effects layer. */
 export interface LaunchResult {
@@ -118,4 +121,16 @@ export interface GameSnapshot {
   elapsedMs: number;
   closeCall: boolean; // pens nearly full
   lossReason: LossReason | null;
+  // --- The Glitch Tide ---
+  tideEnabled: boolean;
+  tide: number; // 0..100 pressure meter
+  tideStage: 'calm' | 'building' | 'critical';
+  tideFrozen: boolean; // frozen by chain / freeze pop / fever / grace
+  strikes: number; // Glitch Strikes taken (3 = loss)
+  maxStrikes: number;
+  lastStrikeId: number; // increments each strike (UI trigger)
+  relaxed: boolean;
+  /** Per-pen recharge progress 0..1 (1 = ready / occupied), for recharge rings. */
+  penRecharge: number[];
+  lastTimeRestored: number; // ms-equivalent restored on the last launch (UI)
 }
