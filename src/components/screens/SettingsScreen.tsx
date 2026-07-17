@@ -205,6 +205,7 @@ function PlaytestStats({ onToast }: { onToast: (msg: string) => void }) {
         <span>⏱ {t.timeRestored} restored · 💀 {t.timeoutLosses} timeouts</span>
         <span>🌬️ {t.feverSaves} fever saves · 🌿 {t.relaxedRuns} relaxed runs</span>
         <span>🛒 {Object.values(t.itemUses).reduce<number>((a, b) => a + (b ?? 0), 0)} items · 🪙 {t.coinContinues} continues</span>
+        <span>🐷 {t.pigsFreed} pigs freed · 🏡 {t.sanctuaryVisits} sanctuary visits</span>
       </div>
       <div className="row" style={{ marginTop: 10 }}>
         <button

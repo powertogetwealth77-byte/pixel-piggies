@@ -191,7 +191,7 @@ await ensureLevelSelect();
 const save = await page.evaluate(() => JSON.parse(localStorage.getItem('pixel-piggies-save-v1') || 'null'));
 if (save) {
   const cleared = Object.values(save.levels).filter((l) => l.cleared).length;
-  if (cleared === 30) ok('all 15 levels cleared and saved'); else fail(`only ${cleared}/30 levels saved as cleared`);
+  if (cleared === 30) ok('all 30 levels cleared and saved'); else fail(`only ${cleared}/30 levels saved as cleared`);
   if (save.mochiRescued) ok('Mochi rescue recorded'); else fail('Mochi rescue not recorded');
   // Purchases are never required: the whole campaign was beaten without buying
   // or using a single recovery item, and no free item uses were spent.
@@ -217,6 +217,6 @@ if (save) {
 } else fail('no save at end of campaign');
 
 console.log('\nconsole errors:', consoleErrors.length ? consoleErrors : 'none');
-console.log(errors.length ? `\n${errors.length} FAILURES` : '\nCAMPAIGN COMPLETE — ALL 15 LEVELS BEATEN');
+console.log(errors.length ? `\n${errors.length} FAILURES` : '\nCAMPAIGN COMPLETE — ALL 30 LEVELS BEATEN');
 await browser.close();
 process.exit(errors.length ? 1 : 0);

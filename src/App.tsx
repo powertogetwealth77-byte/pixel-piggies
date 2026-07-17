@@ -16,6 +16,7 @@ import { MainMenu } from './components/screens/MainMenu';
 import { LevelSelect } from './components/screens/LevelSelect';
 import { SettingsScreen } from './components/screens/SettingsScreen';
 import { KingdomScreen } from './components/kingdom/KingdomScreen';
+import { SanctuaryScreen } from './components/sanctuary/SanctuaryScreen';
 import { GameScreen } from './components/game/GameScreen';
 import { RescueScreen } from './components/screens/RescueScreen';
 
@@ -24,6 +25,7 @@ export type Screen =
   | { name: 'levels' }
   | { name: 'settings' }
   | { name: 'kingdom' }
+  | { name: 'sanctuary' }
   | { name: 'rescue'; piggy: PiggyType }
   | { name: 'game'; levelId: number; runId?: number }
   | { name: 'daily'; runId?: number };
@@ -89,6 +91,7 @@ export function App() {
         ...save,
         coins: save.coins + reward.coins,
         pigment: save.pigment + dailyLevel.pigment,
+        rescueTokens: save.rescueTokens + 3, // daily gives a chunk of tokens
         dailyDone: todayKey(),
       };
       update(next);
@@ -126,6 +129,7 @@ export function App() {
           }}
           onLevels={() => go({ name: 'levels' })}
           onKingdom={() => go({ name: 'kingdom' })}
+          onSanctuary={() => go({ name: 'sanctuary' })}
           onSettings={() => go({ name: 'settings' })}
         />
       )}
@@ -135,8 +139,18 @@ export function App() {
           save={save}
           onBack={() => go({ name: 'menu' })}
           onKingdom={() => go({ name: 'kingdom' })}
+          onSanctuary={() => go({ name: 'sanctuary' })}
           onSelect={(id) => go({ name: 'game', levelId: id })}
           onDaily={() => go({ name: 'daily' })}
+        />
+      )}
+
+      {screen.name === 'sanctuary' && (
+        <SanctuaryScreen
+          save={save}
+          onBack={() => go({ name: 'levels' })}
+          onUpdate={update}
+          onToast={showToast}
         />
       )}
 

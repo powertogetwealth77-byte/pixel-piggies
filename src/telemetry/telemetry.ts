@@ -39,6 +39,8 @@ export interface TelemetryData {
   itemUses: Partial<Record<string, number>>;
   coinContinues: number;
   postLossExits: number;
+  sanctuaryVisits: number;
+  pigsFreed: number;
 }
 
 const KEY = 'pixel-piggies-telemetry-v1';
@@ -66,6 +68,8 @@ function blank(): TelemetryData {
     itemUses: {},
     coinContinues: 0,
     postLossExits: 0,
+    sanctuaryVisits: 0,
+    pigsFreed: 0,
   };
 }
 
@@ -237,6 +241,17 @@ class Telemetry {
 
   postLossExit() {
     this.data.postLossExits += 1;
+    this.persist();
+  }
+
+  sanctuaryVisit() {
+    if (this.duplicate('sanctuary')) return;
+    this.data.sanctuaryVisits += 1;
+    this.persist();
+  }
+
+  pigFreed() {
+    this.data.pigsFreed += 1;
     this.persist();
   }
 

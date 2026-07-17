@@ -8,11 +8,12 @@ interface Props {
   save: SaveData;
   onBack: () => void;
   onKingdom: () => void;
+  onSanctuary: () => void;
   onSelect: (id: number) => void;
   onDaily: () => void;
 }
 
-export function LevelSelect({ save, onBack, onKingdom, onSelect, onDaily }: Props) {
+export function LevelSelect({ save, onBack, onKingdom, onSanctuary, onSelect, onDaily }: Props) {
   const nextLocked = save.unlockedLevel;
   const goal = nextGoal(save);
   const dailyDone = save.dailyDone === todayKey();
@@ -24,9 +25,14 @@ export function LevelSelect({ save, onBack, onKingdom, onSelect, onDaily }: Prop
           ‹
         </button>
         <h2 style={{ margin: 0 }}>Select Level</h2>
-        <button className="icon-btn" onClick={onKingdom} aria-label="Kingdom">
-          🏰
-        </button>
+        <div className="row" style={{ gap: 6 }}>
+          <button className="icon-btn" onClick={onSanctuary} aria-label="Rescue Sanctuary">
+            🐷
+          </button>
+          <button className="icon-btn" onClick={onKingdom} aria-label="Kingdom">
+            🏰
+          </button>
+        </div>
       </div>
 
       <button

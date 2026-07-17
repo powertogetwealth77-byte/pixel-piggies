@@ -3,6 +3,7 @@
 import { LEVELS, LEVEL_COUNT } from '../data/levels';
 import { RESCUE_ARCS } from '../data/piggies';
 import { ITEMS } from '../data/items';
+import { SANCTUARY, type CaptivePig } from '../data/sanctuary';
 import type { ItemId, PiggyType } from '../engine/types';
 
 export interface LevelProgress {
@@ -26,6 +27,10 @@ export interface SaveData {
   levels: Record<number, LevelProgress>;
   coins: number;
   pigment: number;
+  /** Rescue Tokens — earned by playing well, spent to free golden Sanctuary piggies. */
+  rescueTokens: number;
+  /** Captive Sanctuary piggies that have been set free. */
+  freedPigs: Partial<Record<string, boolean>>;
   kingdom: KingdomState;
   /** Kept for backwards compatibility with old saves; mirrors rescued.mochi. */
   mochiRescued: boolean;
@@ -59,6 +64,8 @@ export function defaultSave(): SaveData {
     levels: {},
     coins: 0,
     pigment: 0,
+    rescueTokens: 0,
+    freedPigs: {},
     kingdom: { house: 0, bakery: 0, fountain: 0 },
     mochiRescued: false,
     rescued: {},
@@ -102,6 +109,27 @@ export function useItem(save: SaveData, id: ItemId): SaveData | null {
   return null;
 }
 
+/** Count of Sanctuary piggies set free so far. */
+export function freedPigCount(save: SaveData): number {
+  return SANCTUARY.filter((p) => save.freedPigs[p.id]).length;
+}
+
+export function canAffordPig(save: SaveData, pig: CaptivePig): boolean {
+  if (save.freedPigs[pig.id]) return false;
+  if (pig.cost.tokens != null) return save.rescueTokens >= pig.cost.tokens;
+  return save.coins >= (pig.cost.coins ?? 0);
+}
+
+/** Free a captive Sanctuary piggy, spending coins or tokens. Null if unaffordable. */
+export function freePig(save: SaveData, pig: CaptivePig): SaveData | null {
+  if (!canAffordPig(save, pig)) return null;
+  const next = structuredCloneSafe(save);
+  if (pig.cost.tokens != null) next.rescueTokens -= pig.cost.tokens;
+  else next.coins -= pig.cost.coins ?? 0;
+  next.freedPigs[pig.id] = true;
+  return next;
+}
+
 /** Buy one item with coins. Returns updated save, or null if unaffordable. */
 export function buyItem(save: SaveData, id: ItemId): SaveData | null {
   const price = ITEMS[id].price;
@@ -126,6 +154,7 @@ export function loadSave(): SaveData {
       rescued: { ...parsed.rescued },
       items: { ...parsed.items },
       freeUsed: { ...parsed.freeUsed },
+      freedPigs: { ...parsed.freedPigs },
       settings: { ...defaultSave().settings, ...parsed.settings },
     };
     // Migrate pre-rescue-arc saves: mochiRescued implies rescued.mochi.
@@ -170,9 +199,13 @@ export function applyLevelResult(prev: SaveData, reward: LevelReward): SaveData 
   next.levels[reward.levelId] = { stars: bestStars, bestScore, bestCombo, cleared: true };
 
   next.coins += reward.coins;
+  // Rescue Tokens flow every clear (more for a better result), so there's
+  // always fuel to free the next Sanctuary piggy: 1 + one per star above the first.
+  next.rescueTokens += 1 + Math.max(0, reward.stars - 1);
   // Pigment only granted on the first clear of a level (progression currency).
   if (firstClear) {
     next.pigment += reward.pigment;
+    next.rescueTokens += 1; // first-clear bonus token
     // Rescue milestone: free the caged hero and grant their one-time reward.
     const hero = LEVELS.find((l) => l.id === reward.levelId)?.rescue;
     if (hero && !next.rescued[hero]) {

@@ -9,6 +9,7 @@ interface Props {
   onPlay: () => void;
   onLevels: () => void;
   onKingdom: () => void;
+  onSanctuary: () => void;
   onSettings: () => void;
 }
 
@@ -19,7 +20,7 @@ const HERO_COLORS: Record<PiggyType, ColorId> = {
   prism: 'grape',
 };
 
-export function MainMenu({ save, onPlay, onKingdom, onSettings }: Props) {
+export function MainMenu({ save, onPlay, onKingdom, onSanctuary, onSettings }: Props) {
   const stars = totalStars(save);
   return (
     <div className="screen screen--menu">
@@ -70,6 +71,9 @@ export function MainMenu({ save, onPlay, onKingdom, onSettings }: Props) {
       <div className="menu-actions">
         <button className="btn btn--primary btn--block" onClick={onPlay}>
           ▶ Play
+        </button>
+        <button className="btn btn--coral btn--block" onClick={onSanctuary}>
+          🐷 Rescue Sanctuary
         </button>
         <div className="row">
           <button className="btn btn--mint btn--block" onClick={onKingdom}>

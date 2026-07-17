@@ -1839,3 +1839,86 @@ body.color-symbols .block-symbol {
   opacity: 0.8;
   font-variant-numeric: tabular-nums;
 }
+
+/* ============ Rescue Sanctuary ============ */
+.sanctuary-meadow {
+  position: relative;
+  min-height: 96px;
+  border-radius: var(--radius);
+  background: linear-gradient(180deg, #8fd6fa 0%, #dff4ff 55%, #8fe0b4 55%, #6fd39e 100%);
+  border: 2px solid rgba(255, 255, 255, 0.25);
+  box-shadow: var(--shadow);
+  display: flex;
+  flex-wrap: wrap;
+  align-items: flex-end;
+  justify-content: center;
+  gap: 2px;
+  padding: 8px;
+  overflow: hidden;
+}
+.meadow-pig {
+  animation: meadow-bob 1.8s ease-in-out infinite;
+}
+@keyframes meadow-bob {
+  0%, 100% { transform: translateY(0) rotate(-2deg); }
+  50% { transform: translateY(-6px) rotate(2deg); }
+}
+.meadow-empty {
+  color: #114b31;
+  font-weight: 800;
+  font-size: 0.86rem;
+  text-align: center;
+  margin: auto;
+  padding: 0 12px;
+}
+.captive-grid {
+  display: grid;
+  grid-template-columns: repeat(3, 1fr);
+  gap: 10px;
+}
+@media (min-width: 480px) {
+  .captive-grid {
+    grid-template-columns: repeat(4, 1fr);
+  }
+}
+.captive {
+  display: grid;
+  justify-items: center;
+  gap: 5px;
+  padding: 10px 6px;
+  border-radius: 16px;
+  background: linear-gradient(180deg, rgba(255, 255, 255, 0.1), rgba(255, 255, 255, 0.04));
+  border: 1px solid rgba(255, 255, 255, 0.14);
+}
+.captive.golden {
+  border-color: rgba(255, 200, 61, 0.5);
+  box-shadow: 0 0 14px rgba(255, 200, 61, 0.25);
+  background: linear-gradient(180deg, rgba(255, 200, 61, 0.14), rgba(255, 255, 255, 0.04));
+}
+.captive.freed {
+  opacity: 0.92;
+}
+.captive b {
+  font-size: 0.74rem;
+  text-align: center;
+  line-height: 1.1;
+}
+.captive-avatar {
+  position: relative;
+  width: 52px;
+  height: 52px;
+  display: grid;
+  place-items: center;
+}
+.captive-bars {
+  position: absolute;
+  inset: -3px -1px;
+  width: 56px;
+  height: 56px;
+  opacity: 0.85;
+}
+.captive-done {
+  font-size: 0.72rem;
+  font-weight: 800;
+  color: #8ff0c0;
+}
