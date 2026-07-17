@@ -2235,3 +2235,176 @@ body.color-symbols .block-symbol {
   opacity: 0.92;
   max-width: 320px;
 }
+
+/* ================= Living Sanctuary scene ================= */
+.sanctuary-scene {
+  position: relative;
+  width: 100%;
+  height: 240px;
+  flex: 0 0 auto; /* the screen is a flex column — don't let it shrink the scene */
+  border-radius: 18px;
+  overflow: hidden;
+  margin: 2px 0 4px;
+  box-shadow: inset 0 -30px 50px rgba(0, 0, 0, 0.12);
+  background: linear-gradient(180deg, #9fb0c2 0%, #b8c4cf 55%, #8a9a86 100%);
+  transition: filter 0.6s ease;
+  filter: saturate(0.7) brightness(0.94);
+}
+.scene--t1 { background: linear-gradient(180deg, #f3c88a 0%, #e9c39a 45%, #8bb87e 100%); filter: saturate(0.85) brightness(0.98); }
+.scene--t2 { background: linear-gradient(180deg, #ffd79a 0%, #ffe6b0 45%, #86c47e 100%); filter: none; }
+.scene--t3 { background: linear-gradient(180deg, #ffd591 0%, #ffe9b8 40%, #7fc87f 100%); filter: none; }
+.scene--t4 { background: linear-gradient(180deg, #ffcf8a 0%, #fff0c2 40%, #6fcb7c 100%); filter: saturate(1.05); }
+.scene--t5 { background: linear-gradient(180deg, #ffd27a 0%, #fff3cf 38%, #63cf82 100%); filter: saturate(1.12) brightness(1.03); }
+.scene-sky {
+  position: absolute; inset: 0 0 40% 0;
+  background: radial-gradient(120% 90% at 50% 0%, rgba(255, 240, 200, 0.5), transparent 70%);
+  pointer-events: none;
+}
+.scene--t0 .scene-sky { opacity: 0.25; }
+
+.scene-tree {
+  position: absolute;
+  left: 50%; bottom: 16%;
+  transform: translateX(-50%);
+  z-index: 3;
+}
+.heart-tree {
+  background: none; border: none; padding: 0; margin: 0;
+  display: block; line-height: 0;
+  filter: drop-shadow(0 6px 10px rgba(0, 0, 0, 0.18));
+}
+.heart-tree.tappable { cursor: pointer; }
+.heart-tree.tappable:active { transform: scale(0.97); }
+.ht-leaf { animation: ht-pop 0.5s ease both; transform-origin: center; }
+.ht-firstleaf { animation: ht-shimmer 2.2s ease-in-out infinite; }
+.ht-heart { animation: ht-beat 2.4s ease-in-out infinite; transform-origin: 100px 92px; }
+.ht-halo { animation: ht-halo 4s ease-in-out infinite; transform-origin: center; }
+@keyframes ht-pop { from { transform: scale(0); opacity: 0; } to { transform: scale(1); opacity: 1; } }
+@keyframes ht-shimmer { 0%, 100% { opacity: 0.75; } 50% { opacity: 1; } }
+@keyframes ht-beat { 0%, 100% { transform: scale(1); } 50% { transform: scale(1.08); } }
+@keyframes ht-halo { 0%, 100% { opacity: 0.55; } 50% { opacity: 0.9; } }
+
+/* Fence line */
+.scene-fence {
+  position: absolute; left: 0; right: 0; bottom: 6%;
+  display: flex; justify-content: space-around; align-items: flex-end;
+  padding: 0 8%; z-index: 1; pointer-events: none;
+}
+.scene-fence span {
+  width: 7px; height: 20px; border-radius: 3px 3px 0 0;
+  background: #c9a06a;
+  box-shadow: inset -2px 0 0 rgba(0, 0, 0, 0.12);
+}
+.scene-fence.broken span { background: #9a8a76; height: 14px; opacity: 0.8; }
+.scene-fence span.gap { visibility: hidden; }
+
+/* Decorations */
+.scene-deco {
+  position: absolute; font-size: 1.5rem; z-index: 2;
+  filter: drop-shadow(0 3px 4px rgba(0, 0, 0, 0.2));
+  animation: deco-appear 0.6s ease both;
+  pointer-events: none;
+}
+@keyframes deco-appear { from { opacity: 0; transform: scale(0.5) translateY(6px); } to { opacity: 1; transform: none; } }
+.deco-fire { font-size: 1.7rem; animation: deco-appear 0.6s ease both, fire-flicker 0.9s ease-in-out infinite; }
+.deco-butterfly { animation: deco-appear 0.6s ease both, flutter 6s ease-in-out infinite; }
+.deco-bird { animation: deco-appear 0.6s ease both, flutter 7s ease-in-out infinite reverse; }
+.deco-lantern { font-size: 1.3rem; animation: deco-appear 0.6s ease both, sway 3.2s ease-in-out infinite; transform-origin: top center; }
+.deco-castle { font-size: 2.4rem; opacity: 0.9; }
+.deco-rainbow { font-size: 2rem; animation: deco-appear 1.2s ease both; }
+.deco-banner { font-size: 1.3rem; animation: deco-appear 0.6s ease both, sway 2.6s ease-in-out infinite; }
+.deco-home, .deco-school, .deco-market, .deco-bakery { font-size: 1.8rem; }
+@keyframes fire-flicker { 0%, 100% { transform: scale(1); filter: brightness(1) drop-shadow(0 3px 4px rgba(0,0,0,0.2)); } 50% { transform: scale(1.12); filter: brightness(1.2) drop-shadow(0 0 8px rgba(255,150,40,0.6)); } }
+@keyframes flutter { 0%, 100% { transform: translate(0, 0); } 25% { transform: translate(10px, -8px); } 50% { transform: translate(4px, 6px); } 75% { transform: translate(-8px, -4px); } }
+@keyframes sway { 0%, 100% { transform: rotate(-6deg); } 50% { transform: rotate(6deg); } }
+
+/* Fireflies (top tier) */
+.scene-fireflies span {
+  position: absolute; bottom: 30%;
+  width: 5px; height: 5px; border-radius: 50%;
+  background: #fff3a8; box-shadow: 0 0 8px 2px rgba(255, 240, 150, 0.8);
+  animation: firefly 4s ease-in-out infinite;
+}
+@keyframes firefly { 0%, 100% { opacity: 0; transform: translateY(0); } 50% { opacity: 1; transform: translateY(-30px); } }
+
+/* Freed herd band */
+.scene-herd {
+  position: absolute; left: 0; right: 0; bottom: 2%;
+  display: flex; flex-wrap: wrap; gap: 2px 6px;
+  justify-content: center; align-items: flex-end;
+  padding: 0 10px; max-height: 46%; overflow: hidden; z-index: 4;
+}
+.scene-herd .meadow-empty { color: rgba(40, 40, 50, 0.7); font-weight: 700; text-align: center; }
+.meadow-pig--fireside { filter: drop-shadow(0 0 6px rgba(255, 150, 60, 0.5)); }
+.meadow-pig--treeside { filter: drop-shadow(0 0 6px rgba(140, 220, 150, 0.5)); }
+.sanctuary-scene.cheering .meadow-pig { animation: cheer-bounce 0.6s ease 2; }
+@keyframes cheer-bounce { 0%, 100% { transform: translateY(0); } 40% { transform: translateY(-10px); } }
+
+/* Sanctuary tools row */
+.sanctuary-tools { align-items: center; margin: 2px 2px 0; }
+.tier-progress { font-size: 0.8rem; font-weight: 700; opacity: 0.85; }
+.btn--sm { padding: 5px 12px; min-height: 32px; font-size: 0.78rem; }
+
+/* Heart Tree panel */
+.tree-tier-name { margin: 0; font-weight: 800; opacity: 0.85; }
+.tree-stats { display: flex; justify-content: center; gap: 22px; margin: 6px 0; }
+.tree-stats div { display: flex; flex-direction: column; }
+.tree-stats b { font-size: 1.4rem; }
+.tree-stats small { opacity: 0.7; font-weight: 700; }
+
+/* Restoration Memories */
+.memories-list { display: flex; flex-direction: column; gap: 8px; margin: 10px 0; width: 100%; }
+.memory-row {
+  display: flex; align-items: center; gap: 10px;
+  background: rgba(120, 200, 140, 0.14); border: 1px solid rgba(120, 200, 140, 0.35);
+  border-radius: 12px; padding: 10px 12px; cursor: pointer; text-align: left; width: 100%;
+}
+.memory-n { font-weight: 900; font-size: 0.72rem; opacity: 0.7; }
+.memory-title { font-weight: 800; flex: 1; }
+.memory-go { opacity: 0.6; }
+
+/* Restoration reveal overlay */
+.reveal-overlay { cursor: pointer; }
+.reveal-card {
+  position: relative; text-align: center;
+  display: flex; flex-direction: column; align-items: center; gap: 8px;
+  opacity: 0; transform: scale(0.9) translateY(10px);
+  transition: opacity 0.5s ease, transform 0.5s ease;
+}
+.reveal-card.in { opacity: 1; transform: none; }
+.reveal-tree { line-height: 0; }
+.reveal-eyebrow { font-size: 0.68rem; font-weight: 900; letter-spacing: 0.09em; text-transform: uppercase; opacity: 0.8; }
+.reveal-card h2 { margin: 2px 0; }
+.reveal-line { margin: 0 0 6px; font-weight: 700; font-style: italic; opacity: 0.9; max-width: 300px; }
+.reveal-skip { position: absolute; top: -6px; right: -6px; background: none; border: none; color: inherit; font-weight: 800; font-size: 0.8rem; opacity: 0.7; cursor: pointer; }
+.reveal-petals { position: absolute; inset: -20px 0 auto 0; height: 0; pointer-events: none; }
+.reveal-petals span {
+  position: absolute; top: 0; width: 9px; height: 9px; border-radius: 60% 0 60% 0;
+  background: #ffc0d6; opacity: 0.9; animation: petal-fall 2.4s linear infinite;
+}
+@keyframes petal-fall { from { transform: translateY(-10px) rotate(0); opacity: 0.9; } to { transform: translateY(220px) rotate(220deg); opacity: 0; } }
+
+/* Menu Sanctuary status card */
+.sanctuary-status {
+  display: flex; align-items: center; gap: 12px; width: 100%;
+  background: linear-gradient(135deg, rgba(120, 200, 140, 0.18), rgba(255, 214, 122, 0.16));
+  border: 1px solid rgba(120, 200, 140, 0.4); border-radius: 16px;
+  padding: 10px 14px; cursor: pointer; margin: 4px 0; text-align: left;
+}
+.ss-tree { font-size: 1.9rem; }
+.ss-body { flex: 1; display: flex; flex-direction: column; gap: 4px; min-width: 0; }
+.ss-body b { font-size: 0.9rem; }
+.ss-body small { font-size: 0.72rem; opacity: 0.82; font-weight: 600; }
+.ss-bar { height: 6px; border-radius: 3px; background: rgba(0, 0, 0, 0.12); overflow: hidden; }
+.ss-bar span { display: block; height: 100%; border-radius: 3px; background: linear-gradient(90deg, #7fd08a, #ffd76a); transition: width 0.4s ease; }
+.ss-go { font-size: 1.4rem; opacity: 0.5; }
+
+/* Motion / effects guards */
+.reduced-motion .ht-leaf, .reduced-motion .ht-firstleaf, .reduced-motion .ht-heart,
+.reduced-motion .ht-halo, .reduced-motion .scene-deco, .reduced-motion .deco-fire,
+.reduced-motion .deco-butterfly, .reduced-motion .deco-bird, .reduced-motion .deco-lantern,
+.reduced-motion .deco-banner, .reduced-motion .scene-fireflies span,
+.reduced-motion .reveal-petals span, .reduced-motion .sanctuary-scene.cheering .meadow-pig {
+  animation: none !important;
+}
+.low-effects .scene-fireflies, .low-effects .reveal-petals { display: none; }

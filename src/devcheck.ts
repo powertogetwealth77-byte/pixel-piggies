@@ -5,7 +5,7 @@ import { solveLevel } from './engine/solver';
 import { generateDailyLevel, todayKey } from './daily/daily';
 import { defaultSave, resolveLevelReward, claimWorldChest, type LevelReward } from './save/save';
 import { WORLDS } from './data/worlds';
-import { CHAPTER_OF, INTRO_PANELS, sanctuaryTier } from './data/story';
+import { CHAPTER_OF, INTRO_PANELS, sanctuaryTier, nextSanctuaryTier, earnedRevealTiers, SANCTUARY_TIERS } from './data/story';
 import { SANCTUARY, SANCTUARY_COUNT } from './data/sanctuary';
 import type { LevelDef } from './engine/types';
 
@@ -363,13 +363,21 @@ const sc: [string, boolean][] = [];
   sc.push(['chapters are numbered 1..5 in order', WORLDS.every((w) => CHAPTER_OF(w.index)!.n === w.index + 1)]);
   sc.push(['intro cinematic has panels', INTRO_PANELS.length >= 4 && INTRO_PANELS.every((p) => p.lines.length > 0)]);
 
-  // Sanctuary restoration tiers rise monotonically and pick the right band.
-  sc.push(['tier(0) is the empty field', sanctuaryTier(0).min === 0]);
-  sc.push(['tier(1) is the first-warmth band', sanctuaryTier(1).min === 1]);
-  sc.push(['tier(5) still in first band (<6)', sanctuaryTier(5).min === 1]);
-  sc.push(['tier(6) advances to the bakery band', sanctuaryTier(6).min === 6]);
-  sc.push(['tier(SANCTUARY_COUNT) is the final rebirth', sanctuaryTier(SANCTUARY_COUNT).min === 22]);
-  sc.push(['tier bands never regress', (() => { let last = -1; for (let n = 0; n <= 40; n++) { const m = sanctuaryTier(n).min; if (m < last) return false; last = m; } return true; })()]);
+  // Sanctuary restoration: six tiers derive from rescue count at the spec's
+  // boundaries (0, 1, 4, 8, 13, 18) and never regress.
+  sc.push(['six restoration tiers exist', SANCTUARY_TIERS.length === 6]);
+  sc.push(['tier(0) is The Silent Meadow', sanctuaryTier(0).n === 0]);
+  sc.push(['tier(3) is still The First Light', sanctuaryTier(3).n === 1]);
+  sc.push(['tier(4) advances to Home Begins', sanctuaryTier(4).n === 2]);
+  sc.push(['tier(8) is The Herd Returns', sanctuaryTier(8).n === 3]);
+  sc.push(['tier(13) is A Kingdom Awakens', sanctuaryTier(13).n === 4]);
+  sc.push(['tier(18) is Piggy Kingdom Reborn', sanctuaryTier(18).n === 5]);
+  sc.push(['tier(SANCTUARY_COUNT) is the final tier', sanctuaryTier(SANCTUARY_COUNT).n === 5]);
+  sc.push(['tier numbers never regress', (() => { let last = -1; for (let n = 0; n <= 40; n++) { const m = sanctuaryTier(n).n; if (m < last) return false; last = m; } return true; })()]);
+  sc.push(['nextTier at 0 needs 1 pig for The First Light', nextSanctuaryTier(0)?.need === 1 && nextSanctuaryTier(0)?.tier.n === 1]);
+  sc.push(['nextTier at full roster is null', nextSanctuaryTier(SANCTUARY_COUNT) === null]);
+  sc.push(['earnedRevealTiers(0) is empty', earnedRevealTiers(0).length === 0]);
+  sc.push(['earnedRevealTiers(full) covers tiers 1..5', earnedRevealTiers(SANCTUARY_COUNT).join(',') === '1,2,3,4,5']);
 
   // Biscuit carries the necklace clue (the bible's first-rescue beat).
   const biscuit = SANCTUARY.find((p) => p.id === 'biscuit');
@@ -382,6 +390,7 @@ const sc: [string, boolean][] = [];
   const migratedSeen = (JSON.parse(withProgress).unlockedLevel > 1) || Object.keys(JSON.parse(withProgress).levels).length > 0;
   sc.push(['existing-progress save skips the intro', migratedSeen === true]);
   sc.push(['fresh save defaults introSeen=false', defaultSave().story.introSeen === false]);
+  sc.push(['fresh save has empty sanctuaryReveals', Object.keys(defaultSave().story.sanctuaryReveals).length === 0]);
 }
 let storyOk = true;
 for (const [name, pass] of sc) {

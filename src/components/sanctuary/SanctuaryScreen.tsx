@@ -2,9 +2,16 @@ import { useEffect, useState } from 'react';
 import { audio } from '../../audio/audio';
 import { telemetry } from '../../telemetry/telemetry';
 import { SANCTUARY, SANCTUARY_COUNT, type CaptivePig } from '../../data/sanctuary';
-import { sanctuaryTier } from '../../data/story';
+import {
+  sanctuaryTier,
+  nextSanctuaryTier,
+  earnedRevealTiers,
+  SANCTUARY_TIERS,
+} from '../../data/story';
 import { canAffordPig, freePig, freedPigCount, type SaveData } from '../../save/save';
 import { PiggyAvatar } from '../ui/PiggyAvatar';
+import { SanctuaryScene } from './SanctuaryScene';
+import { RestorationReveal } from './RestorationReveal';
 
 interface Props {
   save: SaveData;
@@ -15,29 +22,44 @@ interface Props {
 
 /**
  * The Rescue Sanctuary — spend coins & Rescue Tokens to set captive piggies
- * free. Freed piggies join a happy wandering herd; there's always a next
- * piggy in reach, so the game keeps going long after the last level.
+ * free. The scene visibly heals across six restoration tiers as the herd comes
+ * home, each crossing marked by a one-time reveal (replayable from Restoration
+ * Memories). The Heart Tree at the centre is the running progress symbol.
  */
 export function SanctuaryScreen({ save, onBack, onUpdate, onToast }: Props) {
   const [celebrating, setCelebrating] = useState<CaptivePig | null>(null);
+  const [memoryTier, setMemoryTier] = useState<number | null>(null); // replayed reveal
+  const [treePanel, setTreePanel] = useState(false);
+  const [showMemories, setShowMemories] = useState(false);
+
   const freed = freedPigCount(save);
   const tier = sanctuaryTier(freed);
+  const next = nextSanctuaryTier(freed);
 
   useEffect(() => {
     telemetry.sanctuaryVisit();
   }, []);
 
-  const freedPigs = SANCTUARY.filter((p) => save.freedPigs[p.id]);
+  // The lowest restoration tier the player has earned but not yet seen revealed.
+  const pendingRevealN = earnedRevealTiers(freed).find((n) => !save.story.sanctuaryReveals[n]);
+  const pendingReveal = pendingRevealN != null ? SANCTUARY_TIERS[pendingRevealN] : undefined;
+
+  const markRevealViewed = (n: number) => {
+    onUpdate({
+      ...save,
+      story: { ...save.story, sanctuaryReveals: { ...save.story.sanctuaryReveals, [n]: true } },
+    });
+  };
 
   const rescue = (pig: CaptivePig) => {
-    const next = freePig(save, pig);
-    if (!next) {
+    const nextSave = freePig(save, pig);
+    if (!nextSave) {
       const need = pig.cost.tokens != null ? `${pig.cost.tokens} tokens` : `${pig.cost.coins} coins`;
       onToast(`Need ${need} to free ${pig.name}`);
       audio.fizzle();
       return;
     }
-    onUpdate(next);
+    onUpdate(nextSave);
     telemetry.pigFreed();
     audio.star();
     audio.squeal();
@@ -45,6 +67,20 @@ export function SanctuaryScreen({ save, onBack, onUpdate, onToast }: Props) {
     setCelebrating(pig);
     window.setTimeout(() => setCelebrating((c) => (c === pig ? null : c)), 1700);
   };
+
+  const openTree = () => {
+    telemetry.log('heart_tree_opened');
+    setTreePanel(true);
+  };
+
+  // Tiers whose reveal has been claimed, for the Restoration Memories list.
+  const claimedTiers = SANCTUARY_TIERS.filter((t) => t.n >= 1 && save.story.sanctuaryReveals[t.n]);
+
+  // A queued reveal only shows once the rescue celebration has cleared, so the
+  // two moments never overlap.
+  const revealTier =
+    memoryTier != null ? SANCTUARY_TIERS[memoryTier] : !celebrating ? pendingReveal : undefined;
+  const revealIsReplay = memoryTier != null;
 
   return (
     <div className="screen">
@@ -68,28 +104,19 @@ export function SanctuaryScreen({ save, onBack, onUpdate, onToast }: Props) {
         <p>{tier.line}</p>
       </div>
 
-      {/* Happy meadow of freed piggies */}
-      <div className="sanctuary-meadow">
-        {freedPigs.length === 0 ? (
-          <p className="meadow-empty">No piggies freed yet — rescue your first one below! 🐷</p>
-        ) : (
-          freedPigs.map((p, i) => (
-            <div
-              key={p.id}
-              className="meadow-pig"
-              style={{ animationDelay: `${(i % 8) * 0.2}s` }}
-              title={p.name}
-            >
-              <PiggyAvatar type={p.type} color={p.color} size={40} expression="happy" pose="dance" />
-            </div>
-          ))
-        )}
-      </div>
+      {/* The living, healing Sanctuary. */}
+      <SanctuaryScene save={save} tier={tier.n} onHeartTree={openTree} />
 
-      <div className="card" style={{ textAlign: 'center', fontWeight: 800, fontSize: '0.9rem' }}>
-        {freed < SANCTUARY_COUNT
-          ? '💛 Play levels & the daily to earn coins and tokens — then free more piggies!'
-          : '🎉 You freed every piggy in the Sanctuary! You are a true Piggy Hero.'}
+      {/* Progress + Restoration Memories */}
+      <div className="row row--between sanctuary-tools">
+        <span className="tier-progress">
+          {next ? `${next.need} more to reach “${next.tier.title}”` : '✨ Fully restored'}
+        </span>
+        {claimedTiers.length > 0 && (
+          <button className="btn btn--ghost btn--sm" onClick={() => setShowMemories(true)}>
+            📖 Memories
+          </button>
+        )}
       </div>
 
       {/* Captive piggies to rescue */}
@@ -159,6 +186,70 @@ export function SanctuaryScreen({ save, onBack, onUpdate, onToast }: Props) {
             </button>
           </div>
         </div>
+      )}
+
+      {/* Heart Tree info panel */}
+      {treePanel && (
+        <div className="overlay" onClick={() => setTreePanel(false)}>
+          <div className="dialog" onClick={(e) => e.stopPropagation()}>
+            <h2 style={{ marginBottom: 4 }}>🌳 The Great Heart Tree</h2>
+            <p className="tree-tier-name">Tier {tier.n} · {tier.title}</p>
+            <div className="tree-stats">
+              <div><b>{freed}</b><small>rescued</small></div>
+              <div><b>{SANCTUARY_COUNT - freed}</b><small>remaining</small></div>
+              <div><b>{tier.n}/5</b><small>tier</small></div>
+            </div>
+            <p style={{ margin: '6px 0 0', fontWeight: 700, opacity: 0.9 }}>{tier.line}</p>
+            <p style={{ margin: '4px 0 0', fontSize: '0.85rem', opacity: 0.8 }}>
+              {next ? `${next.need} more ${next.need === 1 ? 'piggy' : 'piggies'} to reach “${next.tier.title}.”` : 'Every piggy is home. The Heart Tree blazes gold. 💛'}
+            </p>
+            <button className="btn btn--primary btn--block" onClick={() => setTreePanel(false)}>
+              Close
+            </button>
+          </div>
+        </div>
+      )}
+
+      {/* Restoration Memories — replay any claimed reveal */}
+      {showMemories && (
+        <div className="overlay" onClick={() => setShowMemories(false)}>
+          <div className="dialog" onClick={(e) => e.stopPropagation()}>
+            <h2>📖 Restoration Memories</h2>
+            <p style={{ margin: 0, opacity: 0.8, fontSize: '0.85rem' }}>Relive how the Sanctuary healed.</p>
+            <div className="memories-list">
+              {claimedTiers.map((t) => (
+                <button
+                  key={t.n}
+                  className="memory-row"
+                  onClick={() => {
+                    setShowMemories(false);
+                    setMemoryTier(t.n);
+                  }}
+                >
+                  <span className="memory-n">Tier {t.n}</span>
+                  <span className="memory-title">{t.title}</span>
+                  <span className="memory-go">▶</span>
+                </button>
+              ))}
+            </div>
+            <button className="btn btn--ghost btn--block" onClick={() => setShowMemories(false)}>
+              Close
+            </button>
+          </div>
+        </div>
+      )}
+
+      {/* Restoration reveal (new tier, or a replayed memory) */}
+      {revealTier && (
+        <RestorationReveal
+          key={`${revealTier.n}:${revealIsReplay ? 'replay' : 'new'}`}
+          tier={revealTier}
+          replay={revealIsReplay}
+          onDone={() => {
+            if (revealIsReplay) setMemoryTier(null);
+            else markRevealViewed(revealTier.n);
+          }}
+        />
       )}
     </div>
   );

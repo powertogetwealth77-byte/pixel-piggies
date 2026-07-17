@@ -264,6 +264,14 @@ class AudioManager {
     this.tone(523, 0.6, 'triangle', 0.06, 0.16);
   }
 
+  /** Warm rising flourish for a Sanctuary restoration reveal. */
+  restoreFlourish() {
+    const seq = [392, 523, 659, 784];
+    seq.forEach((f, i) => this.tone(f, 0.4, 'triangle', 0.16, i * 0.13));
+    this.tone(1047, 0.6, 'sine', 0.12, 0.5); // warm bloom
+    this.tone(659, 0.7, 'sine', 0.06, 0.5); // soft under-layer
+  }
+
   spawn() {
     this.tone(660, 0.09, 'sine', 0.14, 0, 880);
   }

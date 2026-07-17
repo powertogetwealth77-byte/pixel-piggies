@@ -4,6 +4,7 @@ import { LEVELS, LEVEL_COUNT } from '../data/levels';
 import { RESCUE_ARCS } from '../data/piggies';
 import { ITEMS } from '../data/items';
 import { SANCTUARY, type CaptivePig } from '../data/sanctuary';
+import { earnedRevealTiers } from '../data/story';
 import type { ItemId, PiggyType } from '../engine/types';
 
 export interface LevelProgress {
@@ -48,8 +49,12 @@ export interface SaveData {
   starRewarded: Partial<Record<string, boolean>>;
   /** Anti-grind: consecutive non-improving replays of the same level. */
   replay: { levelId: number; streak: number };
-  /** Story-layer flags. `introSeen` gates the one-time opening cinematic. */
-  story: { introSeen: boolean };
+  /**
+   * Story-layer flags. `introSeen` gates the one-time opening cinematic;
+   * `sanctuaryReveals` records which restoration-tier reveals (keyed by tier
+   * number 1–5) have already played, so each plays once.
+   */
+  story: { introSeen: boolean; sanctuaryReveals: Partial<Record<number, boolean>> };
   settings: {
     muted: boolean;
     musicOff: boolean;
@@ -83,7 +88,7 @@ export function defaultSave(): SaveData {
     worldChests: {},
     starRewarded: {},
     replay: { levelId: 0, streak: 0 },
-    story: { introSeen: false },
+    story: { introSeen: false, sanctuaryReveals: {} },
     settings: {
       muted: false,
       musicOff: false,
@@ -95,6 +100,17 @@ export function defaultSave(): SaveData {
       theme: 'classic',
     },
   };
+}
+
+/**
+ * Reveals a pre-feature save has already earned, keyed by tier number, so old
+ * players don't get a flood of restoration reveals for tiers they long passed.
+ */
+function backfillReveals(freedPigs: SaveData['freedPigs'] | undefined): Partial<Record<number, boolean>> {
+  const freed = SANCTUARY.filter((p) => freedPigs?.[p.id]).length;
+  const out: Partial<Record<number, boolean>> = {};
+  for (const n of earnedRevealTiers(freed)) out[n] = true;
+  return out;
 }
 
 /** Remaining free introductory uses of an item. */
@@ -220,8 +236,16 @@ export function loadSave(): SaveData {
       // Returning players who already have progress shouldn't be interrupted by
       // the opening cinematic — treat a pre-story save as already-seen. New and
       // first-run players (no progress) get the intro. It's replayable either way.
-      story: parsed.story ?? {
-        introSeen: (parsed.unlockedLevel ?? 1) > 1 || Object.keys(parsed.levels ?? {}).length > 0,
+      // Restoration reveals: if this save predates the feature, backfill the
+      // reveals the player already earned so they don't get a flood of them on
+      // their next Sanctuary visit — future tiers still reveal normally.
+      story: {
+        introSeen:
+          parsed.story?.introSeen ??
+          ((parsed.unlockedLevel ?? 1) > 1 || Object.keys(parsed.levels ?? {}).length > 0),
+        sanctuaryReveals: parsed.story?.sanctuaryReveals
+          ? { ...parsed.story.sanctuaryReveals }
+          : backfillReveals(parsed.freedPigs),
       },
       settings: { ...defaultSave().settings, ...parsed.settings },
     };

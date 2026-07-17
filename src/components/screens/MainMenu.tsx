@@ -1,5 +1,8 @@
 import type { SaveData } from '../../save/save';
-import { totalStars } from '../../save/save';
+import { totalStars, freedPigCount } from '../../save/save';
+import { SANCTUARY_COUNT } from '../../data/sanctuary';
+import { sanctuaryTier, nextSanctuaryTier } from '../../data/story';
+import { telemetry } from '../../telemetry/telemetry';
 import { PIGGIES } from '../../data/piggies';
 import { PiggyAvatar } from '../ui/PiggyAvatar';
 import type { ColorId, PiggyType } from '../../engine/types';
@@ -23,6 +26,12 @@ const HERO_COLORS: Record<PiggyType, ColorId> = {
 
 export function MainMenu({ save, onPlay, onKingdom, onSanctuary, onSettings, onStory }: Props) {
   const stars = totalStars(save);
+  const freed = freedPigCount(save);
+  const tier = sanctuaryTier(freed);
+  const next = nextSanctuaryTier(freed);
+  const tierPct = next
+    ? Math.round(((freed - tier.min) / (next.tier.min - tier.min)) * 100)
+    : 100;
   return (
     <div className="screen screen--menu">
       <div className="menu-hero">
@@ -68,6 +77,25 @@ export function MainMenu({ save, onPlay, onKingdom, onSanctuary, onSettings, onS
         <span className="pill">🪙 {save.coins}</span>
         <span className="pill">🎨 {save.pigment}</span>
       </div>
+
+      <button
+        className="sanctuary-status"
+        onClick={() => {
+          telemetry.log('sanctuary_status_clicked');
+          onSanctuary();
+        }}
+      >
+        <span className="ss-tree" aria-hidden="true">🌳</span>
+        <span className="ss-body">
+          <b>Sanctuary · {tier.title}</b>
+          <span className="ss-bar"><span style={{ width: `${tierPct}%` }} /></span>
+          <small>
+            🐷 {freed}/{SANCTUARY_COUNT} home
+            {next ? ` · ${next.need} more to “${next.tier.title}”` : ' · fully restored ✨'}
+          </small>
+        </span>
+        <span className="ss-go" aria-hidden="true">›</span>
+      </button>
 
       <div className="menu-actions">
         <button className="btn btn--primary btn--block" onClick={onPlay}>

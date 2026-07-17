@@ -82,22 +82,25 @@ export const CHAPTER_OF = (worldIndex: number): ChapterDef | undefined => CHAPTE
 
 /** Sanctuary restoration narration — grows as more pigs are brought home. */
 export interface SanctuaryTier {
+  n: number; // tier index 0–5
   min: number; // freed count at which this tier begins
   title: string;
-  line: string;
+  line: string; // the on-reveal narration
 }
 
 /**
- * Scaled to the current 22-pig roster (the bible's 1–100 arc, compressed).
- * Higher tiers unlock as the herd reunites; the top tier is the full rebirth.
+ * Six restoration tiers keyed to rescue count (the bible's 1–100 arc,
+ * compressed to the current 22-pig roster). The Sanctuary scene, the Heart
+ * Tree, and the reveal moments all derive from these — there's no separate
+ * progression system.
  */
 export const SANCTUARY_TIERS: SanctuaryTier[] = [
-  { min: 0, title: 'A quiet, broken field', line: 'The Sanctuary waits in silence. Rescue your first piggy to bring it back to life.' },
-  { min: 1, title: 'The first warmth', line: 'A broken fence is mended, a small fire is lit, and the first flowers bloom.' },
-  { min: 6, title: 'The bakery wakes', line: 'The oven lights itself. Homes reappear, water returns, and piggies begin to play.' },
-  { min: 12, title: 'The herd grows', line: 'A school opens, farmers plant crops, and families share meals under the Heart Tree.' },
-  { min: 18, title: 'Festivals return', line: 'Music fills the air and the Heart Tree glows at night. The kingdom remembers joy.' },
-  { min: 22, title: 'Piggy Kingdom reborn', line: 'Every piggy is home. The Great Heart Tree blazes gold — you did this.' },
+  { n: 0, min: 0, title: 'The Silent Meadow', line: 'This place is waiting. Rescue your first piggy to bring it back to life.' },
+  { n: 1, min: 1, title: 'The First Light', line: 'The fire is burning again.' },
+  { n: 2, min: 4, title: 'Home Begins', line: 'The oven lights itself. Home remembers.' },
+  { n: 3, min: 8, title: 'The Herd Returns', line: 'The meadow is no longer quiet.' },
+  { n: 4, min: 13, title: 'A Kingdom Awakens', line: 'They are not merely surviving anymore.' },
+  { n: 5, min: 18, title: 'Piggy Kingdom Reborn', line: 'A kingdom returns when its families come home.' },
 ];
 
 /** The restoration tier for a given number of freed pigs. */
@@ -105,4 +108,22 @@ export function sanctuaryTier(freed: number): SanctuaryTier {
   let tier = SANCTUARY_TIERS[0];
   for (const t of SANCTUARY_TIERS) if (freed >= t.min) tier = t;
   return tier;
+}
+
+/**
+ * The next tier to reach and how many more pigs are needed, or null once the
+ * Sanctuary is fully reborn. Powers the Heart Tree panel and the menu preview.
+ */
+export function nextSanctuaryTier(
+  freed: number,
+): { tier: SanctuaryTier; need: number } | null {
+  const current = sanctuaryTier(freed);
+  const next = SANCTUARY_TIERS[current.n + 1];
+  if (!next) return null;
+  return { tier: next, need: next.min - freed };
+}
+
+/** Tier numbers whose reveal a player at `freed` pigs has already earned (1–5). */
+export function earnedRevealTiers(freed: number): number[] {
+  return SANCTUARY_TIERS.filter((t) => t.n >= 1 && t.min <= freed).map((t) => t.n);
 }
