@@ -72,7 +72,7 @@ if (await page.locator('.reveal-card').count() === 0) ok('reveal does not replay
 if (await page.locator('.scene--t1').count()) ok('scene advanced to tier 1'); else fail('scene not tier 1');
 
 // Restoration Memories can replay it.
-await page.getByRole('button', { name: /memories/i }).click();
+await page.getByRole('button', { name: /restoration/i }).click();
 await page.waitForTimeout(200);
 await page.locator('.memory-row').first().click();
 await page.waitForTimeout(400);

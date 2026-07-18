@@ -6,6 +6,7 @@ import { ITEMS } from '../data/items';
 import { SANCTUARY, PIG_BY_ID, type CaptivePig } from '../data/sanctuary';
 import { earnedRevealTiers } from '../data/story';
 import { clearedLevelsCount, masteryEligible, masteryReward } from '../data/book';
+import { QUEST_BY_PIG, questStatus, type Quest } from '../data/life';
 import type { ItemId, PiggyType } from '../engine/types';
 
 export interface LevelProgress {
@@ -74,6 +75,17 @@ export interface SaveData {
     /** Whether the Piggy Book intro tooltip has been dismissed. */
     tutorialSeen: boolean;
   };
+  /**
+   * The living-Sanctuary layer: personal-quest claims and viewed Heart Moments.
+   * Quest *progress* is derived from existing save data, so only the one-time
+   * claim + viewed flags are persisted here.
+   */
+  life: {
+    /** Personal quest id -> reward claimed. */
+    quests: Partial<Record<string, boolean>>;
+    /** Heart Moment id -> viewed (unlocks replay). */
+    heartMoments: Partial<Record<string, boolean>>;
+  };
   settings: {
     muted: boolean;
     musicOff: boolean;
@@ -109,6 +121,7 @@ export function defaultSave(): SaveData {
     replay: { levelId: 0, streak: 0 },
     story: { introSeen: false, sanctuaryReveals: {} },
     book: { discovered: {}, reveals: {}, mastery: {}, rescueBaseline: {}, clues: {}, tutorialSeen: false },
+    life: { quests: {}, heartMoments: {} },
     settings: {
       muted: false,
       musicOff: false,
@@ -349,6 +362,13 @@ export function loadSave(): SaveData {
           : backfillReveals(parsed.freedPigs),
       },
       book: buildBook(parsed),
+      // The living-Sanctuary layer defaults empty; qualifying progress is
+      // derived live, and rewards claim once — so nothing needs backfilling and
+      // no currency changes on migration.
+      life: {
+        quests: { ...parsed.life?.quests },
+        heartMoments: { ...parsed.life?.heartMoments },
+      },
       settings: { ...defaultSave().settings, ...parsed.settings },
     };
     // Migrate pre-rescue-arc saves: mochiRescued implies rescued.mochi.
@@ -540,6 +560,35 @@ export function resolveLevelReward(
     next.unlockedLevel = reward.levelId + 1;
   }
   return { next, summary };
+}
+
+/** Mark a Heart Moment as viewed (unlocks its replay). */
+export function markHeartMomentViewed(save: SaveData, momentId: string): SaveData {
+  const next = structuredCloneSafe(save);
+  next.life.heartMoments[momentId] = true;
+  return next;
+}
+
+/**
+ * Claim a pig's completed personal quest exactly once, granting its reward.
+ * Progress is derived live from existing save data, so already-qualifying
+ * players can claim immediately — but never twice.
+ */
+export function claimQuest(
+  save: SaveData,
+  pigId: string,
+): { next: SaveData; quest: Quest; coins: number; tokens: number } | null {
+  const quest = QUEST_BY_PIG[pigId];
+  if (!quest) return null;
+  const status = questStatus(save, quest);
+  if (!status.complete || status.claimed) return null;
+  const next = structuredCloneSafe(save);
+  next.life.quests[quest.id] = true;
+  const coins = quest.reward.coins ?? 0;
+  const tokens = quest.reward.tokens ?? 0;
+  next.coins += coins;
+  next.rescueTokens += tokens;
+  return { next, quest, coins, tokens };
 }
 
 /** Spend pigment to restore part of the kingdom. Returns null if unaffordable. */

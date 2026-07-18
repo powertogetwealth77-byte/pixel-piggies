@@ -3,11 +3,12 @@ import { solveAll } from './engine/solver';
 import { GameEngine } from './engine/engine';
 import { solveLevel } from './engine/solver';
 import { generateDailyLevel, todayKey } from './daily/daily';
-import { defaultSave, resolveLevelReward, claimWorldChest, freePig, claimMasteryReward, type LevelReward } from './save/save';
+import { defaultSave, resolveLevelReward, claimWorldChest, freePig, claimMasteryReward, claimQuest, markHeartMomentViewed, type LevelReward } from './save/save';
 import { WORLDS } from './data/worlds';
 import { CHAPTER_OF, INTRO_PANELS, sanctuaryTier, nextSanctuaryTier, earnedRevealTiers, SANCTUARY_TIERS } from './data/story';
 import { SANCTUARY, SANCTUARY_COUNT, CHARACTERS, PIG_BY_ID, RARITY_ORDER, rarityCounts, rescueChains } from './data/sanctuary';
 import { collectionStats, pigState, masteryEligible } from './data/book';
+import { PIG_ACTIVITIES, RELATIONSHIPS, HEART_MOMENTS, QUESTS, QUEST_BY_PIG, questStatus, pickAmbient, PERIOD_ORDER } from './data/life';
 import type { LevelDef } from './engine/types';
 
 // Validate board/picture dimensions.
@@ -473,4 +474,73 @@ for (const [name, pass] of bc) {
 }
 console.log(bookOk ? `PIGGY BOOK OK (${bc.length} checks)` : 'PIGGY BOOK FAILURES');
 
-if (!chainOk || !allSolvable || !dimOk || !dailyOk || !tideOk || !rewardOk || !storyOk || !bookOk) throw new Error('devcheck failed');
+// ---- Living Sanctuary: behaviours, relationships, moments, quests ----
+const lc: [string, boolean][] = [];
+{
+  // Every pig has at least two ambient behaviours.
+  lc.push(['every pig has ≥2 ambient behaviours', CHARACTERS.every((c) => (PIG_ACTIVITIES[c.id]?.length ?? 0) >= 2)]);
+
+  // Ambient scheduler caps concurrent behaviours.
+  const allIds = CHARACTERS.map((c) => c.id);
+  const picked = pickAmbient(allIds, 'morning', 3, 4);
+  lc.push(['ambient scheduler caps at 4', picked.length <= 4]);
+  lc.push(['ambient picks are valid pigs', picked.every((a) => allIds.includes(a.pigId))]);
+
+  // Relationship category quotas.
+  const count = (t: string) => RELATIONSHIPS.filter((r) => r.type === t).length;
+  lc.push(['≥3 family relationships', count('family') >= 3]);
+  lc.push(['≥4 friendships', count('friends') >= 4]);
+  lc.push(['≥2 mentor relationships', count('mentor') >= 2]);
+  lc.push(['≥2 partnerships', count('partners') >= 2]);
+  lc.push(['≥1 friendly rivalry', count('rivals') >= 1]);
+  lc.push(['≥1 royal alliance', count('royal') >= 1]);
+  lc.push(['relationship pigs all resolve', RELATIONSHIPS.every((r) => PIG_BY_ID[r.a] && PIG_BY_ID[r.b] && r.a !== r.b)]);
+
+  // Heart Moments.
+  lc.push(['at least 12 Heart Moments', HEART_MOMENTS.length >= 12]);
+  lc.push(['heart moment pigs all resolve', HEART_MOMENTS.every((m) => m.pigs.length > 0 && m.pigs.every((id) => PIG_BY_ID[id]))]);
+  lc.push(['unique heart moment ids', new Set(HEART_MOMENTS.map((m) => m.id)).size === HEART_MOMENTS.length]);
+
+  // Personal quests: one per pig, unique, modest rewards.
+  lc.push(['22 personal quests', QUESTS.length === 22]);
+  lc.push(['one quest per pig', CHARACTERS.every((c) => !!QUEST_BY_PIG[c.id])]);
+  lc.push(['quest rewards never require a purchase', QUESTS.every((q) => (q.reward.coins ?? 0) <= 60 && (q.reward.tokens ?? 0) <= 1)]);
+  const totalQuestCoins = QUESTS.reduce((s, q) => s + (q.reward.coins ?? 0), 0);
+  lc.push(['total quest coins are modest (< a few world chests)', totalQuestCoins < 700]);
+
+  // A quest completes for free and claims exactly once.
+  let qsv = defaultSave();
+  qsv.coins = 500;
+  const sunny = CHARACTERS.find((c) => c.id === 'sunny')!;
+  qsv = freePig(qsv, sunny)!; // Sunny's quest: clear 4 levels
+  lc.push(['fresh quest is not yet complete', !questStatus(qsv, QUEST_BY_PIG.sunny).complete]);
+  for (let i = 1; i <= 4; i++) qsv.levels[i] = { stars: 1, bestScore: 1, bestCombo: 0, cleared: true };
+  lc.push(['quest completes from ordinary play', questStatus(qsv, QUEST_BY_PIG.sunny).complete]);
+  const coinsPre = qsv.coins;
+  const claimQ = claimQuest(qsv, 'sunny');
+  lc.push(['claiming a quest grants its coin reward', !!claimQ && claimQ.coins === 20 && claimQ.next.coins === coinsPre + 20]);
+  qsv = claimQ!.next;
+  lc.push(['a quest cannot be claimed twice', claimQuest(qsv, 'sunny') === null]);
+
+  // A heart-moment quest counts a viewed moment (Doodle needs "Nap Time").
+  let hsv = defaultSave();
+  hsv.coins = 5000;
+  hsv = freePig(hsv, CHARACTERS.find((c) => c.id === 'marsh')!)!;
+  hsv = freePig(hsv, CHARACTERS.find((c) => c.id === 'doodle')!)!;
+  lc.push(['heart-moment quest incomplete before viewing', !questStatus(hsv, QUEST_BY_PIG.doodle).complete]);
+  hsv = markHeartMomentViewed(hsv, 'marsh_doodle');
+  lc.push(['heart-moment quest completes after viewing', questStatus(hsv, QUEST_BY_PIG.doodle).complete]);
+
+  // A day period always resolves.
+  lc.push(['period cycle has four phases', PERIOD_ORDER.length === 4]);
+}
+let lifeOk = true;
+for (const [name, pass] of lc) {
+  if (!pass) {
+    console.log(`LIFE CHECK FAILED: ${name}`);
+    lifeOk = false;
+  }
+}
+console.log(lifeOk ? `LIVING SANCTUARY OK (${lc.length} checks)` : 'LIVING SANCTUARY FAILURES');
+
+if (!chainOk || !allSolvable || !dimOk || !dailyOk || !tideOk || !rewardOk || !storyOk || !bookOk || !lifeOk) throw new Error('devcheck failed');

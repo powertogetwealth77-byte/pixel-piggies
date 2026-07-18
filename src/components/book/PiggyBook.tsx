@@ -17,6 +17,14 @@ import {
 } from '../../data/book';
 import { claimMasteryReward, type SaveData } from '../../save/save';
 import { SHOP_PREVIEW } from '../../data/shop';
+import {
+  relationshipsFor,
+  REL_LABEL,
+  QUEST_BY_PIG,
+  questStatus,
+  HEART_MOMENTS,
+  PIG_ACTIVITIES,
+} from '../../data/life';
 import { PigPortrait } from './PigPortrait';
 import { SupplyCart } from './SupplyCart';
 
@@ -194,6 +202,7 @@ function PigCardBody({
   const eligible = masteryEligible(save, pig.id);
   const canClaim = eligible > claimed;
   const rels = pig.relationshipIds.map((id) => PIG_BY_ID[id]?.name).filter(Boolean);
+  const [tab, setTab] = useState<'card' | 'journal'>('card');
 
   return (
     <>
@@ -202,6 +211,20 @@ function PigCardBody({
       <h2 style={{ margin: '2px 0' }}>{pig.name}</h2>
       <p className="pig-title">{pig.title} · No. {no}/{CHARACTERS.length}</p>
 
+      <div className="card-tabs">
+        <button className={tab === 'card' ? 'on' : ''} onClick={() => setTab('card')}>Card</button>
+        <button
+          className={tab === 'journal' ? 'on' : ''}
+          onClick={() => { setTab('journal'); telemetry.log('pig_journal_opened'); }}
+        >
+          📔 Journal
+        </button>
+      </div>
+
+      {tab === 'journal' ? (
+        <PigJournal pig={pig} save={save} claimed={claimed} />
+      ) : (
+      <>
       <div className="pig-facts">
         <div><b>Role</b><span>{pig.role}</span></div>
         <div><b>Personality</b><span>{pig.personality}</span></div>
@@ -233,6 +256,62 @@ function PigCardBody({
           </button>
         )}
       </div>
+      </>
+      )}
     </>
+  );
+}
+
+function PigJournal({ pig, save, claimed }: { pig: PigCharacter; save: SaveData; claimed: number }) {
+  const rels = relationshipsFor(pig.id);
+  const quest = QUEST_BY_PIG[pig.id];
+  const qs = questStatus(save, quest);
+  const moments = HEART_MOMENTS.filter((m) => m.pigs.includes(pig.id) && save.life.heartMoments[m.id]);
+  const activity = PIG_ACTIVITIES[pig.id]?.[0];
+  const cosmetics = [
+    claimed >= 2 ? `${pig.accessory} accessory` : null,
+    qs.claimed ? quest.reward.cosmetic : null,
+  ].filter(Boolean);
+
+  return (
+    <div className="journal">
+      <p className="pig-bio">{pig.biography}</p>
+      {pig.story && <p className="pig-memory">💛 {pig.story}</p>}
+
+      <div className="journal-sec">
+        <b>🏡 Role &amp; activity</b>
+        <span>{pig.role} · {activity ? activity.label : pig.idleLine}</span>
+      </div>
+
+      {rels.length > 0 && (
+        <div className="journal-sec">
+          <b>🤝 Relationships</b>
+          {rels.map((r) => {
+            const other = r.a === pig.id ? r.b : r.a;
+            const name = PIG_BY_ID[other]?.name ?? other;
+            return <span key={`${r.a}-${r.b}`}>{REL_LABEL[r.type]} — {name} ({r.interaction})</span>;
+          })}
+        </div>
+      )}
+
+      <div className="journal-sec">
+        <b>🎯 {quest.name}</b>
+        <span>{quest.desc}</span>
+        <div className="quest-bar"><span style={{ width: `${Math.round((qs.done / qs.need) * 100)}%` }} /></div>
+        <span className="journal-quest-state">
+          {qs.claimed ? '✅ Claimed' : qs.complete ? '⭐ Ready — claim in the Sanctuary' : `In progress · ${qs.done}/${qs.need}`}
+        </span>
+      </div>
+
+      <div className="journal-sec">
+        <b>💛 Heart Moments</b>
+        <span>{moments.length ? moments.map((m) => m.title).join(', ') : 'None unlocked yet.'}</span>
+      </div>
+
+      <div className="journal-sec">
+        <b>✨ Mastery &amp; cosmetics</b>
+        <span>{MASTERY_LABEL[claimed]}{cosmetics.length ? ` · ${cosmetics.join(', ')}` : ''}</span>
+      </div>
+    </div>
   );
 }

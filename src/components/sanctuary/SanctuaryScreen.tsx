@@ -1,4 +1,4 @@
-import { useEffect, useState } from 'react';
+import { useEffect, useRef, useState } from 'react';
 import { audio } from '../../audio/audio';
 import { telemetry } from '../../telemetry/telemetry';
 import { SANCTUARY, SANCTUARY_COUNT, PIG_BY_ID, type CaptivePig } from '../../data/sanctuary';
@@ -8,10 +8,28 @@ import {
   earnedRevealTiers,
   SANCTUARY_TIERS,
 } from '../../data/story';
-import { canAffordPig, freePig, freedPigCount, markPigRevealViewed, type SaveData } from '../../save/save';
+import {
+  nextHeartMoment,
+  eligibleHeartMoments,
+  questStatus,
+  QUEST_BY_PIG,
+  type Quest,
+  type HeartMoment as HeartMomentDef,
+} from '../../data/life';
+import {
+  canAffordPig,
+  freePig,
+  freedPigCount,
+  markPigRevealViewed,
+  markHeartMomentViewed,
+  claimQuest,
+  type SaveData,
+} from '../../save/save';
 import { PiggyAvatar } from '../ui/PiggyAvatar';
+import { PigPortrait } from '../book/PigPortrait';
 import { SanctuaryScene } from './SanctuaryScene';
 import { RestorationReveal } from './RestorationReveal';
+import { HeartMoment } from './HeartMoment';
 import { RescueReveal } from '../book/RescueReveal';
 
 interface Props {
@@ -33,6 +51,11 @@ export function SanctuaryScreen({ save, onBack, onBook, onUpdate, onToast }: Pro
   const [memoryTier, setMemoryTier] = useState<number | null>(null); // replayed reveal
   const [treePanel, setTreePanel] = useState(false);
   const [showMemories, setShowMemories] = useState(false);
+  const [questPig, setQuestPig] = useState<string | null>(null); // open quest dialog
+  const [moment, setMoment] = useState<HeartMomentDef | null>(null); // playing heart moment
+  const [momentReplay, setMomentReplay] = useState(false);
+  const [showMoments, setShowMoments] = useState(false); // heart-moment replay list
+  const sessionSeen = useRef<Set<string>>(new Set()); // moments shown this session
 
   const freed = freedPigCount(save);
   const tier = sanctuaryTier(freed);
@@ -41,6 +64,36 @@ export function SanctuaryScreen({ save, onBack, onBook, onUpdate, onToast }: Pro
   useEffect(() => {
     telemetry.sanctuaryVisit();
   }, []);
+
+  // Show one unviewed, eligible Heart Moment on entry (never more than one, and
+  // never one already seen this session). Waits for any rescue reveal to clear.
+  useEffect(() => {
+    if (revealId || moment) return;
+    const m = nextHeartMoment(save, sessionSeen.current);
+    if (m) {
+      sessionSeen.current.add(m.id);
+      setMomentReplay(false);
+      setMoment(m);
+    }
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [revealId, freed]);
+
+  const openQuest = (quest: Quest) => {
+    telemetry.log('pig_personal_quest_opened');
+    setQuestPig(quest.pigId);
+  };
+
+  const claim = (pigId: string) => {
+    const res = claimQuest(save, pigId);
+    if (!res) return;
+    onUpdate(res.next);
+    telemetry.log('pig_personal_quest_completed');
+    telemetry.log('pig_personal_quest_reward_claimed');
+    audio.star();
+    const bonus = `${res.coins ? ` 🪙 ${res.coins}` : ''}${res.tokens ? ` 🎟️ ${res.tokens}` : ''}`;
+    onToast(`${PIG_BY_ID[pigId].name}: ${res.quest.name} complete!${bonus}`);
+    setQuestPig(null);
+  };
 
   // The lowest restoration tier the player has earned but not yet seen revealed.
   const pendingRevealN = earnedRevealTiers(freed).find((n) => !save.story.sanctuaryReveals[n]);
@@ -92,7 +145,7 @@ export function SanctuaryScreen({ save, onBack, onBook, onUpdate, onToast }: Pro
   // A queued restoration reveal only shows once any character reveal has
   // cleared, so the two moments never overlap.
   const revealTier =
-    memoryTier != null ? SANCTUARY_TIERS[memoryTier] : !revealId ? pendingReveal : undefined;
+    memoryTier != null ? SANCTUARY_TIERS[memoryTier] : !revealId && !moment ? pendingReveal : undefined;
   const revealIsReplay = memoryTier != null;
   const revealPig = revealId ? PIG_BY_ID[revealId] : null;
 
@@ -119,18 +172,25 @@ export function SanctuaryScreen({ save, onBack, onBook, onUpdate, onToast }: Pro
       </div>
 
       {/* The living, healing Sanctuary. */}
-      <SanctuaryScene save={save} tier={tier.n} onHeartTree={openTree} />
+      <SanctuaryScene save={save} tier={tier.n} onHeartTree={openTree} onOpenQuest={openQuest} />
 
-      {/* Progress + Restoration Memories */}
+      {/* Progress + Memories */}
       <div className="row row--between sanctuary-tools">
         <span className="tier-progress">
           {next ? `${next.need} more to reach “${next.tier.title}”` : '✨ Fully restored'}
         </span>
-        {claimedTiers.length > 0 && (
-          <button className="btn btn--ghost btn--sm" onClick={() => setShowMemories(true)}>
-            📖 Memories
-          </button>
-        )}
+        <div className="row" style={{ gap: 6 }}>
+          {eligibleHeartMoments(save).some((m) => save.life.heartMoments[m.id]) && (
+            <button className="btn btn--ghost btn--sm" onClick={() => setShowMoments(true)}>
+              💛 Moments
+            </button>
+          )}
+          {claimedTiers.length > 0 && (
+            <button className="btn btn--ghost btn--sm" onClick={() => setShowMemories(true)}>
+              📖 Restoration
+            </button>
+          )}
+        </div>
       </div>
 
       {/* Captive piggies to rescue */}
@@ -236,6 +296,72 @@ export function SanctuaryScreen({ save, onBack, onBook, onUpdate, onToast }: Pro
             </button>
           </div>
         </div>
+      )}
+
+      {/* Personal quest dialog */}
+      {questPig && (() => {
+        const quest = QUEST_BY_PIG[questPig];
+        const st = questStatus(save, quest);
+        const pig = PIG_BY_ID[questPig];
+        return (
+          <div className="overlay" onClick={() => setQuestPig(null)}>
+            <div className="dialog quest-dialog" onClick={(e) => e.stopPropagation()}>
+              <PigPortrait pig={pig} size={72} state="rescued" glow />
+              <span className="quest-eyebrow">🎯 {pig.name}’s Quest</span>
+              <h2 style={{ margin: '2px 0' }}>{quest.name}</h2>
+              <p className="quest-desc">{quest.desc}</p>
+              <div className="quest-bar"><span style={{ width: `${Math.round((st.done / st.need) * 100)}%` }} /></div>
+              <p className="quest-count">{st.done}/{st.need}{st.complete ? ' · ready!' : ''}</p>
+              <p className="quest-reward">
+                Reward:{quest.reward.coins ? ` 🪙 ${quest.reward.coins}` : ''}{quest.reward.tokens ? ` 🎟️ ${quest.reward.tokens}` : ''}{quest.reward.cosmetic ? ` · ${quest.reward.cosmetic}` : ''}
+              </p>
+              {st.claimed ? (
+                <p className="quest-claimed">✅ Claimed — {quest.reward.storyLine}</p>
+              ) : st.complete ? (
+                <button className="btn btn--primary btn--block" onClick={() => claim(questPig)}>✨ Claim reward</button>
+              ) : (
+                <p className="quest-hint">Keep playing to finish this quest — it never expires.</p>
+              )}
+              <button className="btn btn--ghost btn--block" onClick={() => setQuestPig(null)}>Close</button>
+            </div>
+          </div>
+        );
+      })()}
+
+      {/* Heart Moments replay list */}
+      {showMoments && (
+        <div className="overlay" onClick={() => setShowMoments(false)}>
+          <div className="dialog" onClick={(e) => e.stopPropagation()}>
+            <h2>💛 Heart Moments</h2>
+            <p style={{ margin: 0, opacity: 0.8, fontSize: '0.85rem' }}>Little moments between friends.</p>
+            <div className="memories-list">
+              {eligibleHeartMoments(save).filter((m) => save.life.heartMoments[m.id]).map((m) => (
+                <button
+                  key={m.id}
+                  className="memory-row"
+                  onClick={() => { setShowMoments(false); setMomentReplay(true); setMoment(m); }}
+                >
+                  <span className="memory-title">{m.title}</span>
+                  <span className="memory-go">▶</span>
+                </button>
+              ))}
+            </div>
+            <button className="btn btn--ghost btn--block" onClick={() => setShowMoments(false)}>Close</button>
+          </div>
+        </div>
+      )}
+
+      {/* Heart Moment scene */}
+      {moment && (
+        <HeartMoment
+          key={`${moment.id}:${momentReplay ? 'replay' : 'new'}`}
+          moment={moment}
+          replay={momentReplay}
+          onDone={() => {
+            if (!momentReplay) onUpdate(markHeartMomentViewed(save, moment.id));
+            setMoment(null);
+          }}
+        />
       )}
 
       {/* Restoration reveal (new tier, or a replayed memory) */}
