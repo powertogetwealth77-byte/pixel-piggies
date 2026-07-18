@@ -533,6 +533,12 @@ const lc: [string, boolean][] = [];
 
   // A day period always resolves.
   lc.push(['period cycle has four phases', PERIOD_ORDER.length === 4]);
+
+  // Level-feel settings default safely (auto-migrate for old saves).
+  const ds = defaultSave().settings;
+  lc.push(['gameplay callouts default on', ds.callouts === true]);
+  lc.push(['smart hints default on', ds.smartHints === true]);
+  lc.push(['fast celebration defaults off', ds.fastWin === false]);
 }
 let lifeOk = true;
 for (const [name, pass] of lc) {

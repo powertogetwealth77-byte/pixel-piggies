@@ -130,8 +130,8 @@ else fail('level 1 play ended with: ' + result1);
 await page.waitForTimeout(700);
 await page.screenshot({ path: `${SHOT_DIR}/05-win-dialog.png` });
 
-// Win dialog should show stars + picture + continue
-const winVisible = await page.getByText(/Level Complete/i).count();
+// Win dialog should show stars + picture + continue (heading varies by outcome).
+const winVisible = await page.getByText(/Level Complete|Herd Saved|Piggies Home|Perfect Pasture|Kingdom Progress|Rescue Complete|Herd Moves Forward/i).count();
 if (winVisible) ok('win dialog visible'); else fail('win dialog missing');
 
 // --- Save persistence ---

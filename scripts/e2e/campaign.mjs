@@ -38,7 +38,7 @@ async function ensureLevelSelect() {
       await page.getByRole('button', { name: /back/i }).click();
       continue;
     }
-    if (await page.getByText(/Level Complete/i).count()) {
+    if (await page.getByText(/Level Complete|Herd Saved|Piggies Home|Perfect Pasture|Kingdom Progress|Rescue Complete|Herd Moves Forward/i).count()) {
       await page.getByRole('button', { name: /continue/i }).click();
       continue;
     }

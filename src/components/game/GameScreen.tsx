@@ -10,6 +10,7 @@ import { ITEMS } from '../../data/items';
 import { telemetry } from '../../telemetry/telemetry';
 import { buyItem, itemAvailable, useItem, nextRescueTarget } from '../../save/save';
 import type { ItemId } from '../../engine/types';
+import { WORLD_OF, LEVEL_TITLE } from '../../data/worlds';
 import { Board } from './Board';
 import { Pens } from './Pens';
 import { TideMeter } from './TideMeter';
@@ -32,12 +33,35 @@ interface Props {
 
 const STAGE_NUM: Record<string, number> = { calm: 1, building: 2, critical: 3 };
 
-/** Escalating combo milestone callouts. */
-const PRAISE = [
-  { at: 8, text: 'Great!' },
-  { at: 16, text: 'Amazing!' },
-  { at: 24, text: 'PIGGYLICIOUS!' },
+/** Original consecutive-clear combo stages — emotional, never touch solvability. */
+const COMBO_STAGES = [
+  { at: 4, text: 'Snack Streak!' },
+  { at: 8, text: 'Piggy Power!' },
+  { at: 12, text: 'Feast Mode!' },
+  { at: 18, text: 'Belly Bonanza!' },
+  { at: 26, text: 'ROYAL BANQUET!' },
 ];
+
+/** Varied, original level-complete headlines chosen by outcome. */
+function winPhrase(perfect: boolean, rescue: boolean, worldDone: boolean): string {
+  if (rescue) return 'Rescue Complete!';
+  if (worldDone) return 'Kingdom Progress!';
+  if (perfect) return 'Perfect Pasture!';
+  const pool = ['Herd Saved!', 'Piggies Home!', 'The Herd Moves Forward!'];
+  return pool[Math.floor(Math.random() * pool.length)];
+}
+
+/** Gentle, shame-free encouragement on the loss screen. */
+const LOSS_LINES = [
+  'The herd is ready to try again.',
+  'Almost there.',
+  'A new path may open the way.',
+  'Tiny setback. Big comeback.',
+  'No pig left behind.',
+];
+
+/** Per-level failure tally this session, so hints appear only after real struggle. */
+const failCounts = new Map<number, number>();
 
 export type PenMood = 'idle' | 'sad' | 'happy' | 'wow';
 
@@ -54,9 +78,15 @@ export function GameScreen({ level, save, onComplete, onExit, onQuit, onRestart,
   const [leanLane, setLeanLane] = useState<number | null>(null);
   const [glitching, setGlitching] = useState(false);
   const [relaxed, setRelaxed] = useState(save.settings.relaxedMode);
+  const callouts = save.settings.callouts;
+  const [showObjective, setShowObjective] = useState(callouts);
+  const [oneMore, setOneMore] = useState(false);
+  const [hint, setHint] = useState<{ lane: number; slot: number } | null>(null);
+  const [hintReady, setHintReady] = useState(false);
   const saveRef = useRef(save);
   saveRef.current = save;
   const moodTimer = useRef(0);
+  const world = WORLD_OF(level.id);
 
   const setMoodFor = useCallback((m: PenMood, ms: number) => {
     setMood(m);
@@ -85,6 +115,41 @@ export function GameScreen({ level, save, onComplete, onExit, onQuit, onRestart,
     return () => audio.stopMusic();
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [engine, level.id]);
+
+  // Objective card: a brief intro (tap or ~1.6s to dismiss). Cosmetic only.
+  useEffect(() => {
+    if (!showObjective) return;
+    telemetry.log('level_objective_viewed');
+    audio.objectiveCue();
+    const t = window.setTimeout(() => setShowObjective(false), 1600);
+    return () => window.clearTimeout(t);
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, []);
+
+  // Smart hint: after a couple of failed attempts this session, allow a gentle,
+  // dismissible hint that highlights one legal move — never auto-solving.
+  useEffect(() => {
+    if (!save.settings.smartHints) return;
+    if ((failCounts.get(level.id) ?? 0) < 2) return;
+    const t = window.setTimeout(() => {
+      setHintReady(true);
+      telemetry.log('smart_hint_offered');
+    }, 6000);
+    return () => window.clearTimeout(t);
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [level.id]);
+
+  // Pause effects + clock when the tab is hidden; the player resumes on return.
+  useEffect(() => {
+    const onVis = () => {
+      if (document.hidden && snap.phase === 'playing' && !paused) {
+        engine.pause();
+        setPaused(true);
+      }
+    };
+    document.addEventListener('visibilitychange', onVis);
+    return () => document.removeEventListener('visibilitychange', onVis);
+  });
 
   // Adaptive music: state follows Fever, then the Tide stage.
   useEffect(() => {
@@ -140,8 +205,10 @@ export function GameScreen({ level, save, onComplete, onExit, onQuit, onRestart,
       vibrate(30);
       setMoodFor('sad', 800);
       telemetry.fizzle(level.id);
+      telemetry.log('invalid_action_feedback');
       return;
     }
+    telemetry.log('valid_action_feedback');
     const big = l.cleared.length >= 5 || l.comboAfter >= 8;
     if (big) setMoodFor('happy', 700);
     audio.pop(l.comboAfter, big);
@@ -190,24 +257,42 @@ export function GameScreen({ level, save, onComplete, onExit, onQuit, onRestart,
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [snap.feverActive]);
 
-  // Combo milestone praise: fires once per milestone per combo run.
+  // Combo milestone callout: original stage names, once per milestone per run.
   const prevCombo = useRef(0);
   useEffect(() => {
     const c = snap.combo;
-    if (c > prevCombo.current) {
-      for (let tier = PRAISE.length - 1; tier >= 0; tier--) {
-        const m = PRAISE[tier];
+    if (callouts && c > prevCombo.current) {
+      for (let tier = COMBO_STAGES.length - 1; tier >= 0; tier--) {
+        const m = COMBO_STAGES[tier];
         if (c >= m.at && prevCombo.current < m.at) {
           setPraise({ text: m.text, tier });
           audio.praise(tier);
           vibrate(20 + tier * 15);
+          telemetry.log('combo_stage_reached');
           window.setTimeout(() => setPraise((p) => (p?.text === m.text ? null : p)), 950);
           break;
         }
       }
     }
     prevCombo.current = c;
-  }, [snap.combo]);
+  }, [snap.combo, callouts]);
+
+  // Near-win tension: a one-time "One more!" nudge when the board is nearly clear.
+  const nearWinFired = useRef(false);
+  useEffect(() => {
+    const nearThreshold = Math.max(2, Math.round(snap.blocksTotal * 0.06));
+    const near = snap.phase === 'playing' && snap.blocksRemaining > 0 && snap.blocksRemaining <= nearThreshold;
+    if (near && !nearWinFired.current) {
+      nearWinFired.current = true;
+      telemetry.log('near_win_entered');
+      if (callouts) {
+        setOneMore(true);
+        audio.oneMore();
+        window.setTimeout(() => setOneMore(false), 1400);
+      }
+    }
+    if (snap.blocksRemaining > nearThreshold) nearWinFired.current = false;
+  }, [snap.blocksRemaining, snap.blocksTotal, snap.phase, callouts]);
 
   // Win / loss resolution.
   useEffect(() => {
@@ -239,7 +324,9 @@ export function GameScreen({ level, save, onComplete, onExit, onQuit, onRestart,
       completedRef.current = true;
       audio.lose();
       vibrate(200);
+      failCounts.set(level.id, (failCounts.get(level.id) ?? 0) + 1);
       telemetry.levelEnd(level.id, false, snap.elapsedMs, snap.bestCombo);
+      telemetry.log('level_failure_reason');
       if (snap.lossReason === 'tide') telemetry.timeoutLoss();
       setResult({
         won: false,
@@ -267,6 +354,35 @@ export function GameScreen({ level, save, onComplete, onExit, onQuit, onRestart,
     },
     [engine, snap.phase, snap.selectedPen, snap.pens, snap.prismUsed, onToast],
   );
+
+  // Derive one legal move from the live board (a pen that matches a lane's
+  // front block, or a prism), then highlight it. Never solves the board.
+  const showHint = useCallback(() => {
+    const s = snap;
+    const laneW = s.width / 3;
+    const frontColor = (lane: number): string | null => {
+      for (let r = s.height - 1; r >= 0; r--)
+        for (let c = Math.round(lane * laneW); c < Math.round((lane + 1) * laneW); c++)
+          if (s.board[r][c]) return s.board[r][c]!.color;
+      return null;
+    };
+    for (let slot = 0; slot < s.pens.length; slot++) {
+      const p = s.pens[slot];
+      if (!p || (p.type === 'prism' && s.prismUsed)) continue;
+      for (let lane = 0; lane < 3; lane++) {
+        const fc = frontColor(lane);
+        if (fc && (p.type === 'prism' || p.color === fc)) {
+          setHint({ lane, slot });
+          engine.selectPen(slot);
+          telemetry.log('smart_hint_used');
+          audio.select();
+          window.setTimeout(() => setHint(null), 2600);
+          return;
+        }
+      }
+    }
+    onToast('Try clearing the lowest pixels first!');
+  }, [snap, engine, onToast]);
 
   const doPause = () => {
     engine.pause();
@@ -379,7 +495,7 @@ export function GameScreen({ level, save, onComplete, onExit, onQuit, onRestart,
   const toggleMute = () => setMuted(audio.toggleMute());
 
   return (
-    <div className={`game ${shakeClass} ${glitching ? 'glitching' : ''}`}>
+    <div className={`game world--${world?.theme ?? 'meadow'} ${shakeClass} ${glitching ? 'glitching' : ''} ${oneMore ? 'near-win' : ''}`}>
       {/* HUD */}
       <div className="hud">
         <div className="hud-top">
@@ -441,8 +557,22 @@ export function GameScreen({ level, save, onComplete, onExit, onQuit, onRestart,
       {praise && !showFeverBanner && (
         <div className={`praise praise--${praise.tier}`}>{praise.text}</div>
       )}
-      {snap.closeCall && snap.phase === 'playing' && !snap.feverActive && (
+      {oneMore && !showFeverBanner && snap.phase === 'playing' && (
+        <div className="one-more">One more! 🐷</div>
+      )}
+      {callouts && snap.closeCall && snap.phase === 'playing' && !snap.feverActive && !oneMore && (
         <div className="close-call">Last piggies — make them count!</div>
+      )}
+      {hint && (
+        <div className="hint-chip">💡 Try lane {hint.lane + 1} with the lit piggy</div>
+      )}
+
+      {/* Smart hint offer (after a few tries; dismissible; never solves) */}
+      {hintReady && !hint && !result && !paused && snap.phase === 'playing' && (
+        <div className="hint-offer">
+          <button className="btn btn--mint" onClick={() => { setHintReady(false); showHint(); }}>💡 Need a hint?</button>
+          <button className="hint-dismiss" onClick={() => setHintReady(false)} aria-label="Dismiss hint">✕</button>
+        </div>
       )}
 
       {/* First-session coaching (level 1 only, until the first pop) */}
@@ -457,6 +587,22 @@ export function GameScreen({ level, save, onComplete, onExit, onQuit, onRestart,
             {snap.selectedPen == null ? 'Tap a piggy to pick it up!' : 'Now tap a lane with the same color!'}
           </div>
         )}
+
+      {/* Objective card — a brief intro, tap or auto-dismiss */}
+      {showObjective && !result && (
+        <div className="overlay objective-overlay" onClick={() => setShowObjective(false)}>
+          <div className={`objective-card world--${world?.theme ?? 'meadow'}`}>
+            {world && <span className="oc-world">World {world.index + 1} · {world.name}</span>}
+            <h2>{LEVEL_TITLE(level.id)}</h2>
+            <p className="oc-goal">
+              {relaxed || !snap.tideEnabled
+                ? `Clear all ${snap.blocksTotal} pixels to reveal ${level.pictureName}.`
+                : `Clear the board before the Glitch Tide overwhelms it — reveal ${level.pictureName}.`}
+            </p>
+            <span className="oc-tap">tap to begin</span>
+          </div>
+        </div>
+      )}
 
       {/* Pause overlay */}
       {paused && !result && (
@@ -503,6 +649,18 @@ export function GameScreen({ level, save, onComplete, onExit, onQuit, onRestart,
         <ResultDialog
           level={level}
           result={result}
+          title={
+            result.won
+              ? winPhrase(
+                  result.reward.stars >= 3,
+                  !!result.summary?.firstClear && !!level.rescue,
+                  !!result.summary?.firstClear && !!world && level.id === world.last,
+                )
+              : undefined
+          }
+          lossLine={LOSS_LINES[Math.floor(Math.random() * LOSS_LINES.length)]}
+          fast={save.settings.fastWin}
+          onSkip={() => telemetry.log('win_sequence_skipped')}
           teaser={result.won ? rescueTeaser(level.id, save) : undefined}
           sanctuary={result.won ? nextRescueTarget(save) : null}
           onSanctuary={() => {
@@ -587,6 +745,10 @@ function RewardBreakdown({ summary: s }: { summary: RewardSummary }) {
 function ResultDialog({
   level,
   result,
+  title,
+  lossLine,
+  fast,
+  onSkip,
   teaser,
   sanctuary,
   onSanctuary,
@@ -597,6 +759,10 @@ function ResultDialog({
 }: {
   level: LevelDef;
   result: { won: boolean; reward: LevelReward; summary?: RewardSummary; lossReason?: 'overflow' | 'ammo' | 'tide' };
+  title?: string;
+  lossLine?: string;
+  fast?: boolean;
+  onSkip?: () => void;
   teaser?: string;
   sanctuary?: ReturnType<typeof nextRescueTarget>;
   onSanctuary?: () => void;
@@ -618,11 +784,12 @@ function ResultDialog({
           <p className="big">{tide ? '⚡' : '😅'}</p>
           <p style={{ fontWeight: 800, margin: 0 }}>
             {tide
-              ? 'Three Glitch Strikes! Keep the board clearing to hold the Tide back.'
+              ? 'The Glitch Tide overwhelmed the board this time.'
               : overflow
-              ? 'So close! Launch faster next time.'
-              : 'Match colors carefully — every piggy counts!'}
+              ? 'The waiting pens filled up.'
+              : 'The board ran out of piggies before it cleared.'}
           </p>
+          {lossLine && <p className="loss-line">{lossLine}</p>}
           {continueOffer && (
             <button
               className="btn btn--mint btn--block"
@@ -650,7 +817,7 @@ function ResultDialog({
         <div className="dialog-piggy">
           <PiggyAvatar type="mochi" color="coral" size={84} expression="happy" pose="dance" />
         </div>
-        <h2>Level Complete!</h2>
+        <h2>{title ?? 'Level Complete!'}</h2>
         <Stars value={reward.stars} size={40} animate />
         <div
           className="picture-reveal"
@@ -667,7 +834,7 @@ function ResultDialog({
                     width: 14,
                     height: 14,
                     background: color,
-                    animationDelay: `${(r * row.length + c) * 12}ms`,
+                    animationDelay: `${(r * row.length + c) * (fast ? 3 : 12)}ms`,
                   }}
                 />
               );
@@ -701,7 +868,10 @@ function ResultDialog({
         )}
 
         {teaser && <p className="rescue-teaser">{teaser}</p>}
-        <button className="btn btn--primary btn--block" onClick={onNext}>
+        <button
+          className="btn btn--primary btn--block"
+          onClick={() => { if (fast) onSkip?.(); onNext(); }}
+        >
           Continue →
         </button>
         {onKingdom && (

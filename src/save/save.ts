@@ -95,6 +95,12 @@ export interface SaveData {
     colorSymbols: boolean;
     relaxedMode: boolean;
     theme: BoardTheme;
+    /** Show in-level callouts (objective card, combo stages, near-win). */
+    callouts: boolean;
+    /** Offer a subtle hint after repeated failures. */
+    smartHints: boolean;
+    /** Shorten the level-complete celebration. */
+    fastWin: boolean;
   };
 }
 
@@ -131,6 +137,9 @@ export function defaultSave(): SaveData {
       colorSymbols: false,
       relaxedMode: false,
       theme: 'classic',
+      callouts: true,
+      smartHints: true,
+      fastWin: false,
     },
   };
 }

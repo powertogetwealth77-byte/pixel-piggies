@@ -264,6 +264,18 @@ class AudioManager {
     this.tone(523, 0.6, 'triangle', 0.06, 0.16);
   }
 
+  /** Soft two-note cue when the objective card appears. */
+  objectiveCue() {
+    this.tone(523, 0.14, 'sine', 0.09, 0, 659);
+    this.tone(784, 0.16, 'triangle', 0.07, 0.1);
+  }
+
+  /** Bright anticipation blip for the "one more!" near-win moment. */
+  oneMore() {
+    this.tone(880, 0.1, 'triangle', 0.12, 0, 1175);
+    this.tone(1175, 0.14, 'sine', 0.1, 0.08);
+  }
+
   /** Warm rising flourish for a Sanctuary restoration reveal. */
   restoreFlourish() {
     const seq = [392, 523, 659, 784];

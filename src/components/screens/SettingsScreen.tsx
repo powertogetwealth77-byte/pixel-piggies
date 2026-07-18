@@ -18,11 +18,12 @@ export function SettingsScreen({ save, onBack, onUpdate, onReset, onToast }: Pro
   const [confirmReset, setConfirmReset] = useState(false);
   const [reports, setReports] = useState<SolveReport[] | null>(null);
 
-  type BoolSetting = 'muted' | 'musicOff' | 'hapticsOff' | 'relaxedMode' | 'reducedMotion' | 'lowEffects' | 'colorSymbols';
+  type BoolSetting = 'muted' | 'musicOff' | 'hapticsOff' | 'relaxedMode' | 'reducedMotion' | 'lowEffects' | 'colorSymbols' | 'callouts' | 'smartHints' | 'fastWin';
   const toggle = (key: BoolSetting) => {
     const next = { ...save, settings: { ...save.settings, [key]: !save.settings[key] } };
     onUpdate(next);
     if (key === 'muted') audio.setMuted(next.settings.muted);
+    if (key === 'callouts') telemetry.log('gameplay_callouts_toggled');
   };
 
   const rows: { key: BoolSetting; label: string; on: boolean; hint?: string }[] = [
@@ -30,6 +31,9 @@ export function SettingsScreen({ save, onBack, onUpdate, onReset, onToast }: Pro
     { key: 'musicOff', label: '🎵 Music', on: !save.settings.musicOff },
     { key: 'hapticsOff', label: '📳 Haptics', on: !save.settings.hapticsOff },
     { key: 'relaxedMode', label: '🌿 Relaxed Mode', on: save.settings.relaxedMode, hint: 'No Glitch Tide · reduced coin rewards' },
+    { key: 'callouts', label: '💬 Gameplay callouts', on: save.settings.callouts, hint: 'Objective card, combo cheers & near-win nudges' },
+    { key: 'smartHints', label: '💡 Smart hints', on: save.settings.smartHints, hint: 'Offer a gentle hint after a few tries' },
+    { key: 'fastWin', label: '⚡ Fast celebration', on: save.settings.fastWin, hint: 'Shorter level-complete sequence' },
     { key: 'reducedMotion', label: '🎬 Reduced motion', on: save.settings.reducedMotion },
     { key: 'lowEffects', label: '🔋 Low effects mode', on: save.settings.lowEffects, hint: 'Fewer particles & glows for older phones' },
     { key: 'colorSymbols', label: '♿ Color symbols', on: save.settings.colorSymbols, hint: 'Shape markers on blocks for color-blind play' },

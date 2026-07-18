@@ -2627,3 +2627,69 @@ body.color-symbols .block-symbol {
 .reduced-motion .heart-pig, .reduced-motion .heart-drift span { animation: none !important; }
 .low-effects .heart-drift { display: none; }
 .low-effects .pig-action { display: none; }
+
+/* ================= Level feel: objective, callouts, hints, world frames ================= */
+/* Objective card at level start */
+.objective-overlay { animation: fadeIn 0.2s ease; }
+.objective-card {
+  display: flex; flex-direction: column; align-items: center; gap: 6px; text-align: center;
+  background: var(--surface, #241a3a); border-radius: 20px; padding: 22px 26px;
+  border-top: 4px solid var(--world-accent, #ffd76a); max-width: 320px;
+  box-shadow: 0 16px 40px rgba(0,0,0,0.4); animation: oc-pop 0.4s cubic-bezier(0.2,1.2,0.4,1) both;
+}
+.oc-world { font-size: 0.66rem; font-weight: 900; letter-spacing: 0.08em; text-transform: uppercase; opacity: 0.75; color: var(--world-accent, #ffd76a); }
+.objective-card h2 { margin: 2px 0; }
+.oc-goal { margin: 0; font-weight: 700; opacity: 0.9; line-height: 1.45; }
+.oc-tap { font-size: 0.72rem; opacity: 0.6; letter-spacing: 0.05em; margin-top: 4px; }
+@keyframes oc-pop { from { opacity: 0; transform: scale(0.85) translateY(12px); } to { opacity: 1; transform: none; } }
+
+/* Near-win "One more!" + board edge pulse */
+.one-more {
+  position: absolute; top: 38%; left: 50%; transform: translateX(-50%);
+  font-size: 1.6rem; font-weight: 900; color: #fff; z-index: 30; pointer-events: none;
+  text-shadow: 0 2px 12px rgba(255,140,60,0.7); animation: one-more-in 0.4s cubic-bezier(0.2,1.4,0.4,1) both;
+}
+@keyframes one-more-in { from { opacity: 0; transform: translateX(-50%) scale(0.6); } to { opacity: 1; transform: translateX(-50%) scale(1); } }
+.game.near-win .board-wrap, .game.near-win .board {
+  animation: near-win-pulse 0.9s ease-in-out infinite;
+}
+@keyframes near-win-pulse { 0%,100% { box-shadow: 0 0 0 0 rgba(255,200,90,0); } 50% { box-shadow: 0 0 0 3px rgba(255,200,90,0.5); } }
+
+/* Loss encouragement line */
+.loss-line { margin: 6px 0 2px; font-weight: 700; font-style: italic; opacity: 0.85; }
+
+/* Smart hint chip + offer */
+.hint-chip {
+  position: absolute; top: 30%; left: 50%; transform: translateX(-50%);
+  background: rgba(120, 200, 140, 0.95); color: #10331e; font-weight: 800; font-size: 0.85rem;
+  padding: 7px 14px; border-radius: 999px; z-index: 30; pointer-events: none;
+  box-shadow: 0 4px 12px rgba(0,0,0,0.3); animation: one-more-in 0.3s ease both;
+}
+.hint-offer {
+  position: absolute; bottom: 14%; left: 50%; transform: translateX(-50%);
+  display: flex; align-items: center; gap: 6px; z-index: 25;
+  animation: one-more-in 0.3s ease both;
+}
+.hint-dismiss {
+  background: rgba(0,0,0,0.3); color: #fff; border: none; border-radius: 50%;
+  width: 28px; height: 28px; font-weight: 800; cursor: pointer;
+}
+
+/* Per-world board-frame personality (subtle accent + frame tint) */
+.game.world--meadow { --world-accent: #7fd08a; }
+.game.world--midnight { --world-accent: #8f9bff; }
+.game.world--kingdom { --world-accent: #ffcf6a; }
+.game.world--elements { --world-accent: #6fd0e0; }
+.game.world--wolf { --world-accent: #ff8a6a; }
+.game .board-wrap, .game .board {
+  --frame: var(--world-accent, #ffd76a);
+}
+.objective-card.world--meadow { --world-accent: #7fd08a; }
+.objective-card.world--midnight { --world-accent: #8f9bff; }
+.objective-card.world--kingdom { --world-accent: #ffcf6a; }
+.objective-card.world--elements { --world-accent: #6fd0e0; }
+.objective-card.world--wolf { --world-accent: #ff8a6a; }
+
+.reduced-motion .one-more, .reduced-motion .game.near-win .board-wrap,
+.reduced-motion .game.near-win .board, .reduced-motion .hint-chip,
+.reduced-motion .objective-card { animation: none !important; }
