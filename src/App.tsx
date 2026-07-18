@@ -15,6 +15,7 @@ import { generateDailyLevel, todayKey } from './daily/daily';
 import type { PiggyType } from './engine/types';
 import { MainMenu } from './components/screens/MainMenu';
 import { StoryCinematic } from './components/screens/StoryCinematic';
+import { PiggyBook } from './components/book/PiggyBook';
 import { LevelSelect } from './components/screens/LevelSelect';
 import { SettingsScreen } from './components/screens/SettingsScreen';
 import { KingdomScreen } from './components/kingdom/KingdomScreen';
@@ -25,6 +26,7 @@ import { RescueScreen } from './components/screens/RescueScreen';
 export type Screen =
   | { name: 'menu' }
   | { name: 'intro'; replay?: boolean }
+  | { name: 'book' }
   | { name: 'levels' }
   | { name: 'settings' }
   | { name: 'kingdom' }
@@ -178,6 +180,17 @@ export function App() {
           onSanctuary={() => go({ name: 'sanctuary' })}
           onSettings={() => go({ name: 'settings' })}
           onStory={() => go({ name: 'intro', replay: true })}
+          onBook={() => go({ name: 'book' })}
+        />
+      )}
+
+      {screen.name === 'book' && (
+        <PiggyBook
+          save={save}
+          onBack={() => go({ name: 'menu' })}
+          onSanctuary={() => go({ name: 'sanctuary' })}
+          onUpdate={update}
+          onToast={showToast}
         />
       )}
 
@@ -198,6 +211,7 @@ export function App() {
         <SanctuaryScreen
           save={save}
           onBack={() => go({ name: 'levels' })}
+          onBook={() => go({ name: 'book' })}
           onUpdate={update}
           onToast={showToast}
         />

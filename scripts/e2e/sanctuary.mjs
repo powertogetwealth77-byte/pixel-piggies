@@ -46,13 +46,12 @@ if (await page.locator('.scene--t0').count()) ok('scene starts at tier 0'); else
 
 // Free the first captive (Rosie) → crosses into Tier 1.
 await page.locator('.captive button').first().click();
-await page.waitForTimeout(400);
-// Close the rescue celebration.
-const yay = page.getByRole('button', { name: /yay/i });
-if (await yay.count()) await yay.click();
-await page.waitForTimeout(400);
+// The character rescue reveal appears first — dismiss it.
+await page.waitForSelector('.reveal-dialog .reveal-name', { timeout: 4000 });
+await page.locator('.reveal-dialog .reveal-skip').click();
+await page.waitForTimeout(500);
 
-// The restoration reveal appears.
+// The restoration reveal then appears.
 if (await page.locator('.reveal-card').count()) ok('crossing tier 1 fires a restoration reveal'); else fail('no reveal on tier-up');
 await page.screenshot({ path: `${SHOT}/sanctuary-reveal.png` });
 

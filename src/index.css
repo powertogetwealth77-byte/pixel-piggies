@@ -2408,3 +2408,127 @@ body.color-symbols .block-symbol {
   animation: none !important;
 }
 .low-effects .scene-fireflies, .low-effects .reveal-petals { display: none; }
+
+/* ================= The Piggy Book ================= */
+:root {
+  --r-common: #9fb0c2;
+  --r-uncommon: #63cf8a;
+  --r-rare: #57a6f2;
+  --r-epic: #b483f0;
+  --r-legendary: #ffb347;
+  --r-golden: #ffd24d;
+}
+.rarity-common { --rc: var(--r-common); }
+.rarity-uncommon { --rc: var(--r-uncommon); }
+.rarity-rare { --rc: var(--r-rare); }
+.rarity-epic { --rc: var(--r-epic); }
+.rarity-legendary { --rc: var(--r-legendary); }
+.rarity-golden { --rc: var(--r-golden); }
+
+/* Portrait with rarity ring + accessory */
+.pig-portrait { position: relative; display: inline-flex; border-radius: 50%; }
+.pig-portrait .pp-avatar { border-radius: 50%; box-shadow: 0 0 0 2.5px var(--rc, #9fb0c2), 0 2px 6px rgba(0,0,0,0.25); }
+.pig-portrait.rarity-golden .pp-avatar,
+.pig-portrait.rarity-legendary .pp-avatar { box-shadow: 0 0 0 2.5px var(--rc), 0 0 10px var(--rc); }
+.pig-portrait.state-hidden .pp-avatar { filter: brightness(0) opacity(0.4); box-shadow: 0 0 0 2.5px #4a4a5a; }
+.pig-portrait.state-discovered .pp-avatar { filter: grayscale(0.35) brightness(0.92); }
+.pp-accessory {
+  position: absolute; right: -4px; bottom: -4px; font-size: 0.9rem;
+  filter: drop-shadow(0 1px 2px rgba(0,0,0,0.4));
+}
+
+/* Rarity tag / text / chip */
+.rarity-tag {
+  display: inline-block; font-size: 0.66rem; font-weight: 900; letter-spacing: 0.06em;
+  text-transform: uppercase; padding: 3px 10px; border-radius: 999px;
+  background: var(--rc, #9fb0c2); color: #1a1130;
+}
+.rarity-text { color: var(--rc); font-weight: 800; }
+.rarity-chip {
+  font-size: 0.64rem; font-weight: 800; padding: 3px 7px; border-radius: 8px;
+  background: color-mix(in srgb, var(--rc) 22%, transparent);
+  border: 1px solid color-mix(in srgb, var(--rc) 55%, transparent);
+  white-space: nowrap;
+}
+
+/* Collection progress */
+.book-progress { background: rgba(255,255,255,0.06); border-radius: 14px; padding: 10px 14px; display: flex; flex-direction: column; gap: 8px; }
+.bp-top { display: flex; justify-content: space-between; font-weight: 800; }
+.bp-bar { height: 8px; border-radius: 4px; background: rgba(0,0,0,0.18); overflow: hidden; }
+.bp-bar span { display: block; height: 100%; border-radius: 4px; background: linear-gradient(90deg, #7fd08a, #ffd76a); }
+.bp-counts { display: flex; justify-content: space-between; font-size: 0.76rem; font-weight: 700; opacity: 0.85; }
+.bp-rarity { display: flex; flex-wrap: wrap; gap: 5px; }
+
+/* Entry grid */
+.book-grid { display: grid; grid-template-columns: repeat(3, 1fr); gap: 10px; }
+@media (min-width: 520px) { .book-grid { grid-template-columns: repeat(4, 1fr); } }
+.book-card {
+  display: flex; flex-direction: column; align-items: center; gap: 5px;
+  background: rgba(255,255,255,0.06); border: 1.5px solid color-mix(in srgb, var(--rc, #556) 40%, transparent);
+  border-radius: 14px; padding: 12px 8px; cursor: pointer; text-align: center; min-height: 116px; justify-content: center;
+}
+.book-card.state-hidden { cursor: default; border-color: rgba(255,255,255,0.08); }
+.book-card.state-rescued { background: color-mix(in srgb, var(--rc) 12%, rgba(255,255,255,0.05)); }
+.book-card b { font-size: 0.82rem; }
+.book-card small { font-size: 0.66rem; opacity: 0.8; line-height: 1.3; }
+.book-card .book-cost { font-weight: 800; opacity: 0.95; }
+.book-silhouette { opacity: 0.85; }
+
+/* Character detail card */
+.pig-card { align-items: center; text-align: center; border-top: 4px solid var(--rc, #9fb0c2); }
+.pig-title { margin: 0; font-weight: 700; opacity: 0.85; font-size: 0.82rem; }
+.pig-clue { margin: 6px 0; font-style: italic; opacity: 0.9; }
+.pig-cost-line { margin: 2px 0 8px; font-weight: 800; }
+.pig-facts { display: grid; grid-template-columns: 1fr 1fr; gap: 6px 12px; width: 100%; margin: 8px 0; }
+.pig-facts > div { display: flex; flex-direction: column; text-align: left; }
+.pig-facts b { font-size: 0.64rem; text-transform: uppercase; letter-spacing: 0.05em; opacity: 0.6; }
+.pig-facts span { font-size: 0.82rem; font-weight: 700; }
+.pig-bio { margin: 4px 0; font-size: 0.85rem; line-height: 1.45; opacity: 0.92; }
+.pig-memory { margin: 4px 0; font-style: italic; font-weight: 700; opacity: 0.9; font-size: 0.82rem; }
+.pig-voice { margin: 4px 0; font-weight: 800; }
+.pig-rels { margin: 2px 0; font-size: 0.8rem; opacity: 0.85; }
+
+/* Cosmetic mastery */
+.mastery { width: 100%; display: flex; flex-direction: column; align-items: center; gap: 6px; margin: 8px 0 2px; padding-top: 8px; border-top: 1px dashed rgba(255,255,255,0.15); }
+.mastery-track { display: flex; gap: 10px; }
+.mastery-dot {
+  width: 26px; height: 26px; border-radius: 50%; display: grid; place-items: center;
+  font-weight: 900; font-size: 0.78rem; background: rgba(255,255,255,0.1); color: rgba(255,255,255,0.6);
+  border: 2px solid rgba(255,255,255,0.15);
+}
+.mastery-dot.on { background: linear-gradient(135deg, #7fd08a, #ffd76a); color: #1a1130; border-color: transparent; }
+.mastery-dot.ready { border-color: #ffd76a; animation: mastery-pulse 1.4s ease-in-out infinite; }
+@keyframes mastery-pulse { 0%,100% { box-shadow: 0 0 0 0 rgba(255,215,106,0.5); } 50% { box-shadow: 0 0 0 5px rgba(255,215,106,0); } }
+.mastery-label { opacity: 0.8; font-weight: 700; text-align: center; }
+
+/* Rescue reveal */
+.reveal-dialog { position: relative; overflow: hidden; align-items: center; text-align: center; border-top: 4px solid var(--rc, #9fb0c2); }
+.reveal-dialog.rank-4, .reveal-dialog.rank-5 { box-shadow: 0 0 40px color-mix(in srgb, var(--rc) 55%, transparent); }
+.reveal-portrait { position: relative; display: grid; place-items: center; margin: 4px 0; }
+.reveal-name { margin: 4px 0 0; }
+.reveal-title { margin: 0; opacity: 0.85; font-weight: 700; font-size: 0.85rem; }
+.reveal-voice { margin: 8px 0 4px; font-weight: 800; font-style: italic; }
+.reveal-role { display: flex; gap: 12px; justify-content: center; font-size: 0.8rem; font-weight: 700; opacity: 0.9; flex-wrap: wrap; }
+.reveal-progress { margin: 6px 0; font-size: 0.82rem; opacity: 0.8; }
+.reveal-sparks { position: absolute; inset: 0; pointer-events: none; }
+.reveal-sparks span {
+  position: absolute; top: -6%; width: 7px; height: 7px; border-radius: 50%;
+  background: var(--rc, #ffd76a); box-shadow: 0 0 8px var(--rc);
+  animation: spark-fall 1.8s linear infinite;
+}
+@keyframes spark-fall { from { transform: translateY(0) scale(1); opacity: 1; } to { transform: translateY(360px) scale(0.4); opacity: 0; } }
+
+/* Supply cart (preview) */
+.supply-cart { align-items: stretch; text-align: left; max-height: 80vh; overflow-y: auto; }
+.supply-note { margin: 0 0 8px; font-size: 0.8rem; opacity: 0.85; font-weight: 600; text-align: center; }
+.supply-list { display: flex; flex-direction: column; gap: 10px; margin-bottom: 10px; }
+.supply-item { display: flex; align-items: center; gap: 10px; background: rgba(255,255,255,0.06); border-radius: 12px; padding: 10px; }
+.supply-icon { font-size: 1.8rem; }
+.supply-body { flex: 1; min-width: 0; }
+.supply-body b { font-size: 0.9rem; }
+.supply-body small { display: block; opacity: 0.8; font-size: 0.74rem; margin-bottom: 2px; }
+.supply-body ul { margin: 2px 0 0; padding-left: 16px; font-size: 0.72rem; opacity: 0.75; }
+.supply-buy { white-space: nowrap; opacity: 0.7; }
+
+.reduced-motion .mastery-dot.ready, .reduced-motion .reveal-sparks span { animation: none; }
+.low-effects .reveal-sparks { display: none; }

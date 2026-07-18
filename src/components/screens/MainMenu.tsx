@@ -15,6 +15,7 @@ interface Props {
   onSanctuary: () => void;
   onSettings: () => void;
   onStory: () => void;
+  onBook: () => void;
 }
 
 const HERO_COLORS: Record<PiggyType, ColorId> = {
@@ -24,7 +25,7 @@ const HERO_COLORS: Record<PiggyType, ColorId> = {
   prism: 'grape',
 };
 
-export function MainMenu({ save, onPlay, onKingdom, onSanctuary, onSettings, onStory }: Props) {
+export function MainMenu({ save, onPlay, onKingdom, onSanctuary, onSettings, onStory, onBook }: Props) {
   const stars = totalStars(save);
   const freed = freedPigCount(save);
   const tier = sanctuaryTier(freed);
@@ -103,6 +104,9 @@ export function MainMenu({ save, onPlay, onKingdom, onSanctuary, onSettings, onS
         </button>
         <button className="btn btn--coral btn--block" onClick={onSanctuary}>
           🐷 Rescue Sanctuary
+        </button>
+        <button className="btn btn--mint btn--block" onClick={onBook}>
+          📖 The Piggy Book
         </button>
         <div className="row">
           <button className="btn btn--mint btn--block" onClick={onKingdom}>

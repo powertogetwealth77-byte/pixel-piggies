@@ -3,10 +3,11 @@ import { solveAll } from './engine/solver';
 import { GameEngine } from './engine/engine';
 import { solveLevel } from './engine/solver';
 import { generateDailyLevel, todayKey } from './daily/daily';
-import { defaultSave, resolveLevelReward, claimWorldChest, type LevelReward } from './save/save';
+import { defaultSave, resolveLevelReward, claimWorldChest, freePig, claimMasteryReward, type LevelReward } from './save/save';
 import { WORLDS } from './data/worlds';
 import { CHAPTER_OF, INTRO_PANELS, sanctuaryTier, nextSanctuaryTier, earnedRevealTiers, SANCTUARY_TIERS } from './data/story';
-import { SANCTUARY, SANCTUARY_COUNT } from './data/sanctuary';
+import { SANCTUARY, SANCTUARY_COUNT, CHARACTERS, PIG_BY_ID, RARITY_ORDER, rarityCounts, rescueChains } from './data/sanctuary';
+import { collectionStats, pigState, masteryEligible } from './data/book';
 import type { LevelDef } from './engine/types';
 
 // Validate board/picture dimensions.
@@ -401,4 +402,75 @@ for (const [name, pass] of sc) {
 }
 console.log(storyOk ? `STORY LAYER OK (${sc.length} checks)` : 'STORY LAYER FAILURES');
 
-if (!chainOk || !allSolvable || !dimOk || !dailyOk || !tideOk || !rewardOk || !storyOk) throw new Error('devcheck failed');
+// ---- Piggy Book: roster, rarity, chains, collection math, mastery ----
+const bc: [string, boolean][] = [];
+{
+  // Complete, distinct roster.
+  bc.push(['22 characters', CHARACTERS.length === 22]);
+  const fieldsOk = CHARACTERS.every(
+    (c) => c.title && c.role && c.personality && c.favoriteFood && c.biography && c.rescueLine && c.sanctuaryLocation && c.discoveryClue && c.accessory,
+  );
+  bc.push(['every character has full identity fields', fieldsOk]);
+  bc.push(['unique titles', new Set(CHARACTERS.map((c) => c.title)).size === 22]);
+
+  // Rarity distribution: 6/5/4/3/2/2.
+  const rc2 = rarityCounts();
+  bc.push(['rarity 6 common', rc2.common === 6]);
+  bc.push(['rarity 5 uncommon', rc2.uncommon === 5]);
+  bc.push(['rarity 4 rare', rc2.rare === 4]);
+  bc.push(['rarity 3 epic', rc2.epic === 3]);
+  bc.push(['rarity 2 legendary', rc2.legendary === 2]);
+  bc.push(['rarity 2 golden', rc2.golden === 2]);
+  bc.push(['rarity totals to 22', RARITY_ORDER.reduce((s, r) => s + rc2[r], 0) === 22]);
+
+  // Rescue chains — at least six, all valid.
+  const chains = rescueChains();
+  bc.push(['at least 6 rescue chains', chains.length >= 6]);
+  bc.push(['chains point to real, different pigs', chains.every((c) => PIG_BY_ID[c.to] && c.to !== c.from)]);
+  bc.push(['relationship ids all resolve', CHARACTERS.every((c) => c.relationshipIds.every((id) => !!PIG_BY_ID[id]))]);
+
+  // Collection math on a fresh save.
+  const fresh = defaultSave();
+  const st = collectionStats(fresh);
+  bc.push(['fresh: 0 rescued, 22 total', st.rescued === 0 && st.total === 22]);
+  bc.push(['fresh: some pigs discovered (upcoming), rest hidden', st.discovered >= 1 && st.discovered + st.hidden === 22]);
+  bc.push(['fresh: 0% complete', st.pct === 0]);
+
+  // Freeing a pig rescues it + follows its chain (Rosie → Pebbles).
+  let sv = defaultSave();
+  sv.coins = 5000;
+  const rosie = CHARACTERS.find((c) => c.id === 'rosie')!;
+  sv = freePig(sv, rosie)!;
+  bc.push(['freeing Rosie marks her rescued', pigState(sv, 'rosie') === 'rescued']);
+  bc.push(['Rosie discovers her brother Pebbles', !!sv.book.discovered['pebbles']]);
+  bc.push(['collection ticks to 1 rescued', collectionStats(sv).rescued === 1]);
+
+  // Cosmetic mastery: advances with progress, never pays twice.
+  bc.push(['Rosie mastery starts at Level 1', masteryEligible(sv, 'rosie') === 1]);
+  for (let i = 1; i <= 3; i++) sv.levels[i] = { stars: 1, bestScore: 1, bestCombo: 0, cleared: true };
+  bc.push(['3 cleared levels → eligible Level 2', masteryEligible(sv, 'rosie') === 2]);
+  const claim1 = claimMasteryReward(sv, 'rosie');
+  bc.push(['claim advances to Level 2', !!claim1 && claim1.level === 2]);
+  sv = claim1!.next;
+  bc.push(['claiming again is a no-op (no dup)', claimMasteryReward(sv, 'rosie') === null]);
+  for (let i = 4; i <= 8; i++) sv.levels[i] = { stars: 1, bestScore: 1, bestCombo: 0, cleared: true };
+  const coinsBefore = sv.coins;
+  const claim3 = claimMasteryReward(sv, 'rosie');
+  bc.push(['8 cleared → Level 3 with a coin reward', !!claim3 && claim3.level === 3 && claim3.coins > 0]);
+  sv = claim3!.next;
+  bc.push(['Level 3 paid its reward once', sv.coins === coinsBefore + (claim3!.coins)]);
+  bc.push(['Level 3 cannot be re-claimed', claimMasteryReward(sv, 'rosie') === null]);
+
+  // Every pig stays free-earnable (has a coin or token cost, no "paywall").
+  bc.push(['every pig has an in-game cost', CHARACTERS.every((c) => c.cost.coins != null || c.cost.tokens != null)]);
+}
+let bookOk = true;
+for (const [name, pass] of bc) {
+  if (!pass) {
+    console.log(`BOOK CHECK FAILED: ${name}`);
+    bookOk = false;
+  }
+}
+console.log(bookOk ? `PIGGY BOOK OK (${bc.length} checks)` : 'PIGGY BOOK FAILURES');
+
+if (!chainOk || !allSolvable || !dimOk || !dailyOk || !tideOk || !rewardOk || !storyOk || !bookOk) throw new Error('devcheck failed');

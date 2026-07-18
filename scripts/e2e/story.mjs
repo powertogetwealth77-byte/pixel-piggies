@@ -65,10 +65,13 @@ await page.waitForSelector('.world-map', { timeout: 6000 });
 await page.locator('.icon-btn[aria-label="Rescue Sanctuary"]').click();
 await page.waitForTimeout(300);
 if (await page.locator('.restore-banner').count()) ok('sanctuary restoration banner renders'); else fail('no restoration banner');
-// Rosie is the first captive and carries a memory line.
+// Freeing a pig now plays the character rescue reveal (its memory lives on the
+// Piggy Book card, covered by book.mjs).
 await page.locator('.captive button').first().click();
-await page.waitForTimeout(400);
-if (await page.locator('.rescue-memory').count()) ok('freeing a storied pig shows a memory line'); else fail('no memory line on rescue');
+await page.waitForSelector('.reveal-dialog .reveal-name', { timeout: 4000 });
+if (await page.locator('.reveal-dialog').count()) ok('freeing a pig plays its character reveal'); else fail('no character reveal on rescue');
+await page.locator('.reveal-dialog .reveal-skip').click();
+await page.waitForTimeout(300);
 await page.screenshot({ path: `${SHOT_DIR}/story-sanctuary.png` });
 
 if (cerr.length === 0) ok('no console errors'); else fail('console errors: ' + cerr.join('; '));

@@ -1,21 +1,23 @@
 import { useEffect, useState } from 'react';
 import { audio } from '../../audio/audio';
 import { telemetry } from '../../telemetry/telemetry';
-import { SANCTUARY, SANCTUARY_COUNT, type CaptivePig } from '../../data/sanctuary';
+import { SANCTUARY, SANCTUARY_COUNT, PIG_BY_ID, type CaptivePig } from '../../data/sanctuary';
 import {
   sanctuaryTier,
   nextSanctuaryTier,
   earnedRevealTiers,
   SANCTUARY_TIERS,
 } from '../../data/story';
-import { canAffordPig, freePig, freedPigCount, type SaveData } from '../../save/save';
+import { canAffordPig, freePig, freedPigCount, markPigRevealViewed, type SaveData } from '../../save/save';
 import { PiggyAvatar } from '../ui/PiggyAvatar';
 import { SanctuaryScene } from './SanctuaryScene';
 import { RestorationReveal } from './RestorationReveal';
+import { RescueReveal } from '../book/RescueReveal';
 
 interface Props {
   save: SaveData;
   onBack: () => void;
+  onBook: () => void;
   onUpdate: (s: SaveData) => void;
   onToast: (msg: string) => void;
 }
@@ -26,8 +28,8 @@ interface Props {
  * home, each crossing marked by a one-time reveal (replayable from Restoration
  * Memories). The Heart Tree at the centre is the running progress symbol.
  */
-export function SanctuaryScreen({ save, onBack, onUpdate, onToast }: Props) {
-  const [celebrating, setCelebrating] = useState<CaptivePig | null>(null);
+export function SanctuaryScreen({ save, onBack, onBook, onUpdate, onToast }: Props) {
+  const [revealId, setRevealId] = useState<string | null>(null); // rescued pig awaiting reveal
   const [memoryTier, setMemoryTier] = useState<number | null>(null); // replayed reveal
   const [treePanel, setTreePanel] = useState(false);
   const [showMemories, setShowMemories] = useState(false);
@@ -59,13 +61,24 @@ export function SanctuaryScreen({ save, onBack, onUpdate, onToast }: Props) {
       audio.fizzle();
       return;
     }
+    telemetry.log('pig_rescue_started');
     onUpdate(nextSave);
     telemetry.pigFreed();
-    audio.star();
     audio.squeal();
-    if (pig.story) window.setTimeout(() => audio.storyChime(), 500); // memory beat
-    setCelebrating(pig);
-    window.setTimeout(() => setCelebrating((c) => (c === pig ? null : c)), 1700);
+    setRevealId(pig.id); // the character reveal handles its own sounds
+  };
+
+  // When a rescue reveal closes: mark it viewed, then surface any rescue-chain
+  // clue this pig gives about another (never auto-rescuing them).
+  const finishReveal = (pigId: string) => {
+    onUpdate(markPigRevealViewed(save, pigId));
+    setRevealId(null);
+    const meta = PIG_BY_ID[pigId];
+    if (meta?.revealsId && meta.chainClue && !save.freedPigs[meta.revealsId]) {
+      telemetry.log('rescue_clue_unlocked');
+      telemetry.log('pig_discovered');
+      window.setTimeout(() => onToast(`🔎 ${meta.chainClue}`), 300);
+    }
   };
 
   const openTree = () => {
@@ -76,11 +89,12 @@ export function SanctuaryScreen({ save, onBack, onUpdate, onToast }: Props) {
   // Tiers whose reveal has been claimed, for the Restoration Memories list.
   const claimedTiers = SANCTUARY_TIERS.filter((t) => t.n >= 1 && save.story.sanctuaryReveals[t.n]);
 
-  // A queued reveal only shows once the rescue celebration has cleared, so the
-  // two moments never overlap.
+  // A queued restoration reveal only shows once any character reveal has
+  // cleared, so the two moments never overlap.
   const revealTier =
-    memoryTier != null ? SANCTUARY_TIERS[memoryTier] : !celebrating ? pendingReveal : undefined;
+    memoryTier != null ? SANCTUARY_TIERS[memoryTier] : !revealId ? pendingReveal : undefined;
   const revealIsReplay = memoryTier != null;
+  const revealPig = revealId ? PIG_BY_ID[revealId] : null;
 
   return (
     <div className="screen">
@@ -89,7 +103,7 @@ export function SanctuaryScreen({ save, onBack, onUpdate, onToast }: Props) {
           ‹
         </button>
         <h2 style={{ margin: 0 }}>Rescue Sanctuary</h2>
-        <span style={{ width: 48 }} />
+        <button className="icon-btn" onClick={onBook} aria-label="The Piggy Book">📖</button>
       </div>
 
       <div className="row" style={{ justifyContent: 'center', gap: 12 }}>
@@ -161,31 +175,16 @@ export function SanctuaryScreen({ save, onBack, onUpdate, onToast }: Props) {
         })}
       </div>
 
-      {/* Free celebration */}
-      {celebrating && (
-        <div className="overlay" onClick={() => setCelebrating(null)}>
-          <div className="dialog">
-            <div className="dialog-piggy">
-              <PiggyAvatar
-                type={celebrating.type}
-                color={celebrating.color}
-                size={96}
-                expression="happy"
-                pose="dance"
-                glow
-              />
-            </div>
-            <h2>{celebrating.name} is free! 🎉</h2>
-            <p style={{ fontWeight: 700, margin: 0, opacity: 0.9 }}>{celebrating.blurb}</p>
-            {celebrating.story && <p className="rescue-memory">💛 {celebrating.story}</p>}
-            <p style={{ margin: 0, opacity: 0.75, fontSize: '0.85rem' }}>
-              {freed}/{SANCTUARY_COUNT} piggies rescued
-            </p>
-            <button className="btn btn--primary btn--block" onClick={() => setCelebrating(null)}>
-              Yay!
-            </button>
-          </div>
-        </div>
+      {/* Character rescue reveal */}
+      {revealPig && (
+        <RescueReveal
+          key={revealPig.id}
+          pig={revealPig}
+          rescued={freed}
+          total={SANCTUARY_COUNT}
+          onDone={() => finishReveal(revealPig.id)}
+          onOpenBook={() => { finishReveal(revealPig.id); onBook(); }}
+        />
       )}
 
       {/* Heart Tree info panel */}

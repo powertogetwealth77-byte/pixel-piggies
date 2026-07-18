@@ -15,7 +15,8 @@
     "test:tide": "node scripts/e2e/tide.mjs",
     "test:world": "node scripts/e2e/world.mjs",
     "test:story": "node scripts/e2e/story.mjs",
-    "test:sanctuary": "node scripts/e2e/sanctuary.mjs"
+    "test:sanctuary": "node scripts/e2e/sanctuary.mjs",
+    "test:book": "node scripts/e2e/book.mjs"
   },
   "dependencies": {
     "react": "^18.3.1",

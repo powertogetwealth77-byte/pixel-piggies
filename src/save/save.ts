@@ -3,8 +3,9 @@
 import { LEVELS, LEVEL_COUNT } from '../data/levels';
 import { RESCUE_ARCS } from '../data/piggies';
 import { ITEMS } from '../data/items';
-import { SANCTUARY, type CaptivePig } from '../data/sanctuary';
+import { SANCTUARY, PIG_BY_ID, type CaptivePig } from '../data/sanctuary';
 import { earnedRevealTiers } from '../data/story';
+import { clearedLevelsCount, masteryEligible, masteryReward } from '../data/book';
 import type { ItemId, PiggyType } from '../engine/types';
 
 export interface LevelProgress {
@@ -55,6 +56,24 @@ export interface SaveData {
    * number 1–5) have already played, so each plays once.
    */
   story: { introSeen: boolean; sanctuaryReveals: Partial<Record<number, boolean>> };
+  /**
+   * The Piggy Book collection state. Everything here augments the rescue data
+   * in `freedPigs`; it never gates whether a pig can be earned.
+   */
+  book: {
+    /** Pigs revealed by a rescue-chain clue (id -> true). */
+    discovered: Partial<Record<string, boolean>>;
+    /** Rescue reveal already viewed (pig id -> true), so it doesn't replay. */
+    reveals: Partial<Record<string, boolean>>;
+    /** Highest cosmetic-mastery level claimed per pig (1–3). */
+    mastery: Partial<Record<string, number>>;
+    /** Progress snapshot taken when a pig was rescued (drives mastery). */
+    rescueBaseline: Partial<Record<string, { cleared: number; freed: number }>>;
+    /** Source pigs whose rescue-chain clue has already been shown. */
+    clues: Partial<Record<string, boolean>>;
+    /** Whether the Piggy Book intro tooltip has been dismissed. */
+    tutorialSeen: boolean;
+  };
   settings: {
     muted: boolean;
     musicOff: boolean;
@@ -89,6 +108,7 @@ export function defaultSave(): SaveData {
     starRewarded: {},
     replay: { levelId: 0, streak: 0 },
     story: { introSeen: false, sanctuaryReveals: {} },
+    book: { discovered: {}, reveals: {}, mastery: {}, rescueBaseline: {}, clues: {}, tutorialSeen: false },
     settings: {
       muted: false,
       musicOff: false,
@@ -111,6 +131,43 @@ function backfillReveals(freedPigs: SaveData['freedPigs'] | undefined): Partial<
   const out: Partial<Record<number, boolean>> = {};
   for (const n of earnedRevealTiers(freed)) out[n] = true;
   return out;
+}
+
+/**
+ * Build the Piggy Book state from a loaded save, merging any stored fields and
+ * backfilling for pre-feature saves so existing rescued pigs are consistent:
+ * their reveal counts as seen (no replay), their rescue-chain clue is applied,
+ * and their mastery reflects current progress WITHOUT a retroactive payout
+ * (currencies must not change on migration).
+ */
+function buildBook(parsed: Partial<SaveData>): SaveData['book'] {
+  const base = defaultSave().book;
+  const stored = parsed.book;
+  const book: SaveData['book'] = {
+    discovered: { ...base.discovered, ...stored?.discovered },
+    reveals: { ...base.reveals, ...stored?.reveals },
+    mastery: { ...base.mastery, ...stored?.mastery },
+    rescueBaseline: { ...base.rescueBaseline, ...stored?.rescueBaseline },
+    clues: { ...base.clues, ...stored?.clues },
+    tutorialSeen: stored?.tutorialSeen ?? base.tutorialSeen,
+  };
+  if (stored) return book; // already on the feature — nothing to backfill
+
+  // Pre-feature save: reconcile the pigs already rescued.
+  const cleared = Object.values(parsed.levels ?? {}).filter((l) => l?.cleared).length;
+  const eligibleLevel = cleared >= 8 ? 3 : cleared >= 3 ? 2 : 1;
+  for (const c of SANCTUARY) {
+    if (!parsed.freedPigs?.[c.id]) continue;
+    book.reveals[c.id] = true; // already rescued — don't replay the reveal
+    book.rescueBaseline[c.id] = { cleared: 0, freed: 0 };
+    book.mastery[c.id] = eligibleLevel; // reflect standing, no coin payout
+    const meta = PIG_BY_ID[c.id];
+    if (meta?.revealsId && !parsed.freedPigs?.[meta.revealsId]) {
+      book.discovered[meta.revealsId] = true;
+      book.clues[c.id] = true;
+    }
+  }
+  return book;
 }
 
 /** Remaining free introductory uses of an item. */
@@ -154,8 +211,52 @@ export function freePig(save: SaveData, pig: CaptivePig): SaveData | null {
   const next = structuredCloneSafe(save);
   if (pig.cost.tokens != null) next.rescueTokens -= pig.cost.tokens;
   else next.coins -= pig.cost.coins ?? 0;
+  const freedBefore = freedPigCount(save);
   next.freedPigs[pig.id] = true;
+  // Piggy Book: snapshot progress for mastery, and follow any rescue chain.
+  next.book.rescueBaseline[pig.id] = { cleared: clearedLevelsCount(next), freed: freedBefore };
+  next.book.mastery[pig.id] = 1; // Level 1 "Rescued"
+  const meta = PIG_BY_ID[pig.id];
+  if (meta?.revealsId && !next.freedPigs[meta.revealsId]) {
+    next.book.discovered[meta.revealsId] = true;
+    next.book.clues[pig.id] = true;
+  }
   return next;
+}
+
+/** Mark a pig's rescue reveal as viewed so it doesn't replay. */
+export function markPigRevealViewed(save: SaveData, pigId: string): SaveData {
+  const next = structuredCloneSafe(save);
+  next.book.reveals[pigId] = true;
+  return next;
+}
+
+/**
+ * Claim any newly-earned cosmetic mastery for a rescued pig, advancing to the
+ * eligible level and granting its rewards exactly once (Level 3 pays a small
+ * coin/token bonus). Returns null if nothing new is claimable.
+ */
+export function claimMasteryReward(
+  save: SaveData,
+  pigId: string,
+): { next: SaveData; level: number; coins: number; tokens: number } | null {
+  const pig = PIG_BY_ID[pigId];
+  if (!pig || !save.freedPigs[pigId]) return null;
+  const eligible = masteryEligible(save, pigId);
+  const claimed = save.book.mastery[pigId] ?? 1;
+  if (eligible <= claimed) return null;
+  const next = structuredCloneSafe(save);
+  let coins = 0;
+  let tokens = 0;
+  for (let lvl = claimed + 1; lvl <= eligible; lvl++) {
+    const r = masteryReward(pig, lvl);
+    coins += r.coins ?? 0;
+    tokens += r.tokens ?? 0;
+  }
+  next.book.mastery[pigId] = eligible;
+  next.coins += coins;
+  next.rescueTokens += tokens;
+  return { next, level: eligible, coins, tokens };
 }
 
 /**
@@ -247,6 +348,7 @@ export function loadSave(): SaveData {
           ? { ...parsed.story.sanctuaryReveals }
           : backfillReveals(parsed.freedPigs),
       },
+      book: buildBook(parsed),
       settings: { ...defaultSave().settings, ...parsed.settings },
     };
     // Migrate pre-rescue-arc saves: mochiRescued implies rescued.mochi.
