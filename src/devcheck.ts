@@ -9,6 +9,9 @@ import { CHAPTER_OF, INTRO_PANELS, sanctuaryTier, nextSanctuaryTier, earnedRevea
 import { SANCTUARY, SANCTUARY_COUNT, CHARACTERS, PIG_BY_ID, RARITY_ORDER, rarityCounts, rescueChains } from './data/sanctuary';
 import { collectionStats, pigState, masteryEligible } from './data/book';
 import { PIG_ACTIVITIES, RELATIONSHIPS, HEART_MOMENTS, QUESTS, QUEST_BY_PIG, questStatus, pickAmbient, PERIOD_ORDER } from './data/life';
+import { validateSaveObject, exportSave, importSave, checksum } from './save/save';
+import { buildDiagnostics } from './playtest/playtest';
+import { APP_VERSION, SAVE_SCHEMA_VERSION } from './version';
 import type { LevelDef } from './engine/types';
 
 // Validate board/picture dimensions.
@@ -539,6 +542,35 @@ const lc: [string, boolean][] = [];
   lc.push(['gameplay callouts default on', ds.callouts === true]);
   lc.push(['smart hints default on', ds.smartHints === true]);
   lc.push(['fast celebration defaults off', ds.fastWin === false]);
+
+  // --- Release hardening: save backup/validate/import + diagnostics ---
+  lc.push(['validate rejects non-objects', !validateSaveObject(null).ok && !validateSaveObject(42).ok]);
+  lc.push(['validate accepts a fresh save', validateSaveObject(defaultSave()).ok]);
+  lc.push(['validate rejects bad version', !validateSaveObject({ ...defaultSave(), version: 99 }).ok]);
+  lc.push(['validate rejects negative coins', !validateSaveObject({ ...defaultSave(), coins: -5 }).ok]);
+  lc.push(['validate rejects absurd coins', !validateSaveObject({ ...defaultSave(), coins: 1e15 }).ok]);
+  lc.push(['validate rejects missing levels', !validateSaveObject({ ...defaultSave(), levels: null }).ok]);
+
+  const seed = defaultSave();
+  seed.coins = 1234; seed.unlockedLevel = 7; seed.freedPigs['rosie'] = true;
+  const exported = exportSave(seed, APP_VERSION);
+  const round = importSave(exported);
+  lc.push(['export → import round-trips', round.ok && round.save?.coins === 1234 && round.save?.unlockedLevel === 7]);
+  lc.push(['import accepts a bare save too', importSave(JSON.stringify(seed)).ok]);
+  lc.push(['import rejects invalid JSON', !importSave('{not json').ok]);
+  lc.push(['import rejects a malformed save', !importSave(JSON.stringify({ version: 1, coins: 'x' })).ok]);
+  lc.push(['checksum is deterministic + content-sensitive', checksum('abc') === checksum('abc') && checksum('abc') !== checksum('abd')]);
+
+  // Diagnostics never leak secrets / fingerprints.
+  const diag = JSON.stringify(buildDiagnostics(seed));
+  const banned = /service_role|SUPABASE|eyJ[A-Za-z0-9_-]{10}|password|secret|token[A-Za-z0-9]{16}/i;
+  lc.push(['diagnostics contain no secret patterns', !banned.test(diag)]);
+  lc.push(['diagnostics include the app version', diag.includes(APP_VERSION)]);
+  lc.push(['diagnostics do not dump the full user agent', !diag.includes('Mozilla/')]);
+
+  // Version source of truth.
+  lc.push(['app version is semver', /^\d+\.\d+\.\d+$/.test(APP_VERSION)]);
+  lc.push(['save schema version is 1', SAVE_SCHEMA_VERSION === 1]);
 }
 let lifeOk = true;
 for (const [name, pass] of lc) {

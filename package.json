@@ -18,7 +18,8 @@
     "test:sanctuary": "node scripts/e2e/sanctuary.mjs",
     "test:book": "node scripts/e2e/book.mjs",
     "test:life": "node scripts/e2e/life.mjs",
-    "test:feel": "node scripts/e2e/feel.mjs"
+    "test:feel": "node scripts/e2e/feel.mjs",
+    "test:playtest": "node scripts/e2e/playtest.mjs"
   },
   "dependencies": {
     "react": "^18.3.1",

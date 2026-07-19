@@ -339,65 +339,231 @@ export function buyItem(save: SaveData, id: ItemId): SaveData | null {
   };
 }
 
-export function loadSave(): SaveData {
+/** Merge a parsed save into the current schema (defensive, additive-only). */
+function migrate(parsed: SaveData): SaveData {
+  const merged: SaveData = {
+    ...defaultSave(),
+    ...parsed,
+    rescued: { ...parsed.rescued },
+    items: { ...parsed.items },
+    freeUsed: { ...parsed.freeUsed },
+    freedPigs: { ...parsed.freedPigs },
+    worldChests: { ...parsed.worldChests },
+    starRewarded: { ...parsed.starRewarded },
+    replay: parsed.replay ?? { levelId: 0, streak: 0 },
+    story: {
+      introSeen:
+        parsed.story?.introSeen ??
+        ((parsed.unlockedLevel ?? 1) > 1 || Object.keys(parsed.levels ?? {}).length > 0),
+      sanctuaryReveals: parsed.story?.sanctuaryReveals
+        ? { ...parsed.story.sanctuaryReveals }
+        : backfillReveals(parsed.freedPigs),
+    },
+    book: buildBook(parsed),
+    life: {
+      quests: { ...parsed.life?.quests },
+      heartMoments: { ...parsed.life?.heartMoments },
+    },
+    settings: { ...defaultSave().settings, ...parsed.settings },
+  };
+  if (merged.mochiRescued) merged.rescued.mochi = true;
+  for (const [id, prog] of Object.entries(merged.levels)) {
+    for (let n = 1; n <= (prog?.stars ?? 0); n++) {
+      merged.starRewarded[`${id}:${n}`] ??= true;
+    }
+  }
+  return merged;
+}
+
+// ---- Save backup, validation & recovery ----------------------------------
+const SNAP_A = 'pixel-piggies-save-snap-a';
+const SNAP_B = 'pixel-piggies-save-snap-b';
+const SNAP_PREIMPORT = 'pixel-piggies-save-preimport';
+let lastSnapAt = 0;
+let snapToggle = 0;
+let recovered = false;
+
+/** Whether the last load had to recover from a backup (main save was corrupt). */
+export function wasRecovered(): boolean {
+  return recovered;
+}
+
+/** Small, fast, non-cryptographic integrity hash (FNV-1a, hex). */
+export function checksum(s: string): string {
+  let h = 0x811c9dc5;
+  for (let i = 0; i < s.length; i++) {
+    h ^= s.charCodeAt(i);
+    h = Math.imul(h, 0x01000193);
+  }
+  return (h >>> 0).toString(16).padStart(8, '0');
+}
+
+export interface SaveSummary {
+  coins: number;
+  tokens: number;
+  freed: number;
+  levelsCleared: number;
+  unlockedLevel: number;
+  stars: number;
+}
+
+function summarize(save: SaveData): SaveSummary {
+  const levels = Object.values(save.levels ?? {});
+  return {
+    coins: save.coins,
+    tokens: save.rescueTokens,
+    freed: Object.values(save.freedPigs ?? {}).filter(Boolean).length,
+    levelsCleared: levels.filter((l) => l?.cleared).length,
+    unlockedLevel: save.unlockedLevel,
+    stars: levels.reduce((s, l) => s + (l?.stars ?? 0), 0),
+  };
+}
+
+/** Validate an unknown value as a plausible, safe SaveData. Never throws. */
+export function validateSaveObject(
+  obj: unknown,
+): { ok: boolean; reason?: string; summary?: SaveSummary } {
+  if (typeof obj !== 'object' || obj === null) return { ok: false, reason: 'Not a save object' };
+  const s = obj as Partial<SaveData>;
+  if (s.version !== VERSION) return { ok: false, reason: `Unsupported save version (${String(s.version)})` };
+  const num = (v: unknown) => typeof v === 'number' && Number.isFinite(v);
+  const safeInt = (v: unknown) => num(v) && (v as number) >= 0 && (v as number) < 1e12;
+  if (!safeInt(s.coins) || !safeInt(s.pigment) || !safeInt(s.rescueTokens))
+    return { ok: false, reason: 'Currencies missing or out of range' };
+  if (!num(s.unlockedLevel) || (s.unlockedLevel as number) < 1 || (s.unlockedLevel as number) > 60)
+    return { ok: false, reason: 'unlockedLevel out of range' };
+  if (typeof s.levels !== 'object' || s.levels === null) return { ok: false, reason: 'levels missing' };
+  if (typeof s.settings !== 'object' || s.settings === null) return { ok: false, reason: 'settings missing' };
+  if (typeof s.freedPigs !== 'object' || s.freedPigs === null) return { ok: false, reason: 'freedPigs missing' };
+  return { ok: true, summary: summarize(s as SaveData) };
+}
+
+/** Envelope produced by exportSave — versioned + checksummed, no secrets. */
+export interface SaveBackup {
+  kind: 'pixel-piggies-save';
+  schema: number;
+  appVersion: string;
+  exportedAt: string;
+  checksum: string;
+  save: SaveData;
+}
+
+/** Serialize a save into a portable, integrity-checked backup string. */
+export function exportSave(save: SaveData, appVersion: string): string {
+  const saveJson = JSON.stringify(save);
+  const backup: SaveBackup = {
+    kind: 'pixel-piggies-save',
+    schema: VERSION,
+    appVersion,
+    exportedAt: new Date().toISOString(),
+    checksum: checksum(saveJson),
+    save,
+  };
+  return JSON.stringify(backup, null, 2);
+}
+
+/**
+ * Parse + validate an exported backup (or a bare save) for import. Accepts the
+ * envelope from exportSave or a plain save object. Does not apply it — the
+ * caller snapshots the current save first, then persists on confirm.
+ */
+export function importSave(
+  text: string,
+): { ok: boolean; save?: SaveData; summary?: SaveSummary; reason?: string } {
+  let parsed: unknown;
+  try {
+    parsed = JSON.parse(text);
+  } catch {
+    return { ok: false, reason: 'Not valid JSON' };
+  }
+  const raw =
+    parsed && typeof parsed === 'object' && (parsed as SaveBackup).kind === 'pixel-piggies-save'
+      ? (parsed as SaveBackup).save
+      : parsed;
+  const check = validateSaveObject(raw);
+  if (!check.ok) return { ok: false, reason: check.reason };
+  return { ok: true, save: migrate(raw as SaveData), summary: check.summary };
+}
+
+/** Copy the current main save into the pre-import backup slot. */
+export function backupBeforeImport() {
   try {
     const raw = localStorage.getItem(KEY);
-    if (!raw) return defaultSave();
-    const parsed = JSON.parse(raw) as SaveData;
-    if (parsed.version !== VERSION) return defaultSave();
-    // Fill any missing fields defensively.
-    const merged: SaveData = {
-      ...defaultSave(),
-      ...parsed,
-      rescued: { ...parsed.rescued },
-      items: { ...parsed.items },
-      freeUsed: { ...parsed.freeUsed },
-      freedPigs: { ...parsed.freedPigs },
-      worldChests: { ...parsed.worldChests },
-      starRewarded: { ...parsed.starRewarded },
-      replay: parsed.replay ?? { levelId: 0, streak: 0 },
-      // Returning players who already have progress shouldn't be interrupted by
-      // the opening cinematic — treat a pre-story save as already-seen. New and
-      // first-run players (no progress) get the intro. It's replayable either way.
-      // Restoration reveals: if this save predates the feature, backfill the
-      // reveals the player already earned so they don't get a flood of them on
-      // their next Sanctuary visit — future tiers still reveal normally.
-      story: {
-        introSeen:
-          parsed.story?.introSeen ??
-          ((parsed.unlockedLevel ?? 1) > 1 || Object.keys(parsed.levels ?? {}).length > 0),
-        sanctuaryReveals: parsed.story?.sanctuaryReveals
-          ? { ...parsed.story.sanctuaryReveals }
-          : backfillReveals(parsed.freedPigs),
-      },
-      book: buildBook(parsed),
-      // The living-Sanctuary layer defaults empty; qualifying progress is
-      // derived live, and rewards claim once — so nothing needs backfilling and
-      // no currency changes on migration.
-      life: {
-        quests: { ...parsed.life?.quests },
-        heartMoments: { ...parsed.life?.heartMoments },
-      },
-      settings: { ...defaultSave().settings, ...parsed.settings },
-    };
-    // Migrate pre-rescue-arc saves: mochiRescued implies rescued.mochi.
-    if (merged.mochiRescued) merged.rescued.mochi = true;
-    // Migrate pre-star-token saves: mark already-owned stars as rewarded so
-    // replays never retroactively grant tokens for stars the player already had.
-    for (const [id, prog] of Object.entries(merged.levels)) {
-      for (let n = 1; n <= (prog?.stars ?? 0); n++) {
-        merged.starRewarded[`${id}:${n}`] ??= true;
-      }
-    }
-    return merged;
+    if (raw) localStorage.setItem(SNAP_PREIMPORT, raw);
   } catch {
+    /* ignore */
+  }
+}
+
+/** Try to recover a valid save from the rotating backups. */
+function recoverSave(): SaveData | null {
+  for (const key of [SNAP_A, SNAP_B, SNAP_PREIMPORT]) {
+    try {
+      const raw = localStorage.getItem(key);
+      if (!raw) continue;
+      const parsed = JSON.parse(raw) as SaveData;
+      if (validateSaveObject(parsed).ok) return migrate(parsed);
+    } catch {
+      /* try next */
+    }
+  }
+  return null;
+}
+
+/** List the available recovery snapshots and their summaries. */
+export function listSnapshots(): Array<{ slot: string; summary: SaveSummary; at?: string }> {
+  const out: Array<{ slot: string; summary: SaveSummary; at?: string }> = [];
+  const labels: Record<string, string> = { [SNAP_A]: 'Recent', [SNAP_B]: 'Older', [SNAP_PREIMPORT]: 'Pre-import' };
+  for (const key of [SNAP_A, SNAP_B, SNAP_PREIMPORT]) {
+    try {
+      const raw = localStorage.getItem(key);
+      if (!raw) continue;
+      const parsed = JSON.parse(raw) as SaveData;
+      if (validateSaveObject(parsed).ok) out.push({ slot: labels[key], summary: summarize(parsed) });
+    } catch {
+      /* skip */
+    }
+  }
+  return out;
+}
+
+export function loadSave(): SaveData {
+  recovered = false;
+  let raw: string | null = null;
+  try {
+    raw = localStorage.getItem(KEY);
+  } catch {
+    return defaultSave();
+  }
+  if (!raw) return defaultSave();
+  try {
+    const parsed = JSON.parse(raw) as SaveData;
+    if (parsed.version !== VERSION) {
+      // Unknown version: don't wipe — try a backup, else start fresh.
+      const rec = recoverSave();
+      if (rec) { recovered = true; return rec; }
+      return defaultSave();
+    }
+    return migrate(parsed);
+  } catch {
+    // Corrupt primary save: recover from a backup rather than silently wiping.
+    const rec = recoverSave();
+    if (rec) { recovered = true; return rec; }
     return defaultSave();
   }
 }
 
 export function persist(data: SaveData) {
   try {
-    localStorage.setItem(KEY, JSON.stringify(data));
+    const json = JSON.stringify(data);
+    localStorage.setItem(KEY, json);
+    // Rotate a spaced pair of validated backups without slowing normal writes.
+    const now = Date.now();
+    if (now - lastSnapAt > 15000) {
+      lastSnapAt = now;
+      localStorage.setItem(snapToggle === 0 ? SNAP_A : SNAP_B, json);
+      snapToggle ^= 1;
+    }
   } catch {
     /* storage may be unavailable */
   }

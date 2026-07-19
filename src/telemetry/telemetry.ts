@@ -43,10 +43,48 @@ export interface TelemetryData {
   pigsFreed: number;
   /** Lightweight internal event counters (world map, replay economy, etc.). */
   events: Partial<Record<string, number>>;
+  /** Anonymous, locally-generated id — no personal data, never sent anywhere. */
+  anonId: string;
+  /** Non-identifying session/device context, refreshed each app load. */
+  context: SessionContext;
+  /** Capped rolling log of recent events (name + relative ms), for the report. */
+  eventLog: Array<{ t: number; name: string }>;
+}
+
+export interface SessionContext {
+  device: 'mobile' | 'tablet' | 'desktop';
+  viewport: string; // "WxH" bucketed
+  browser: string; // family only (Chrome/Safari/Firefox/Edge/Other)
+  reducedMotion: boolean;
+  lowEffects: boolean;
+  sound: boolean;
+  startedAt: string;
 }
 
 const KEY = 'pixel-piggies-telemetry-v1';
 const MAX_DAYS = 120;
+const EVENT_CAP = 3000;
+
+function detectDevice(): SessionContext['device'] {
+  const w = typeof window !== 'undefined' ? window.innerWidth : 1024;
+  const touch = typeof navigator !== 'undefined' && navigator.maxTouchPoints > 0;
+  if (touch && w < 600) return 'mobile';
+  if (touch && w < 1024) return 'tablet';
+  return 'desktop';
+}
+
+function detectBrowser(): string {
+  const ua = typeof navigator !== 'undefined' ? navigator.userAgent : '';
+  if (/Edg\//.test(ua)) return 'Edge';
+  if (/Firefox\//.test(ua)) return 'Firefox';
+  if (/Chrome\//.test(ua)) return 'Chrome';
+  if (/Safari\//.test(ua)) return 'Safari';
+  return 'Other';
+}
+
+function genId(): string {
+  return 'pt-' + Math.random().toString(36).slice(2, 10) + Date.now().toString(36).slice(-4);
+}
 
 function blank(): TelemetryData {
   return {
@@ -73,6 +111,9 @@ function blank(): TelemetryData {
     sanctuaryVisits: 0,
     pigsFreed: 0,
     events: {},
+    anonId: genId(),
+    context: { device: 'desktop', viewport: '', browser: 'Other', reducedMotion: false, lowEffects: false, sound: true, startedAt: new Date().toISOString() },
+    eventLog: [],
   };
 }
 
@@ -130,15 +171,39 @@ class Telemetry {
     return this.data.levels[id];
   }
 
-  session() {
+  private sessionStart = performance.now();
+
+  session(ctx?: { reducedMotion?: boolean; lowEffects?: boolean; sound?: boolean }) {
     if (this.duplicate('session', 5000)) return;
     this.data.sessions += 1;
+    if (!this.data.anonId) this.data.anonId = genId();
+    this.sessionStart = performance.now();
+    this.data.context = {
+      device: detectDevice(),
+      viewport: typeof window !== 'undefined' ? `${window.innerWidth}x${window.innerHeight}` : '',
+      browser: detectBrowser(),
+      reducedMotion: !!ctx?.reducedMotion,
+      lowEffects: !!ctx?.lowEffects,
+      sound: ctx?.sound ?? true,
+      startedAt: new Date().toISOString(),
+    };
     const today = new Date().toISOString().slice(0, 10);
     if (!this.data.daysPlayed.includes(today)) {
       this.data.daysPlayed.push(today);
       if (this.data.daysPlayed.length > MAX_DAYS) this.data.daysPlayed.shift();
     }
     this.persist();
+  }
+
+  /** Milliseconds elapsed in the current session (local, best-effort). */
+  sessionDurationMs(): number {
+    return Math.round(performance.now() - this.sessionStart);
+  }
+
+  /** Record a screen visit as a capped event. */
+  screen(name: string) {
+    if (this.duplicate(`screen:${name}`, 400)) return;
+    this.log(`screen_${name}`);
   }
 
   levelStart(id: number) {
@@ -261,7 +326,57 @@ class Telemetry {
   /** Generic lightweight event logger (world_viewed, level_replayed, …). */
   log(name: string) {
     this.data.events[name] = (this.data.events[name] ?? 0) + 1;
+    // Append to the capped rolling event log (drops oldest beyond the cap).
+    this.data.eventLog.push({ t: Math.round(performance.now() - this.sessionStart), name });
+    if (this.data.eventLog.length > EVENT_CAP) {
+      this.data.eventLog.splice(0, this.data.eventLog.length - EVENT_CAP);
+    }
     this.persist();
+  }
+
+  /** Computed playtest summary: totals, rates, and a per-level table. */
+  summary() {
+    const d = this.data;
+    const rows = Object.entries(d.levels)
+      .map(([id, l]) => {
+        const attempts = l.attempts;
+        const wins = l.wins;
+        return {
+          level: Number(id),
+          attempts,
+          wins,
+          failures: l.losses,
+          completion: attempts ? Math.round((wins / attempts) * 100) : 0,
+          avgMs: l.bestTimeMs ?? 0,
+          retries: l.retries,
+        };
+      })
+      .sort((a, b) => a.level - b.level);
+    const totalAttempts = rows.reduce((s, r) => s + r.attempts, 0);
+    const totalWins = rows.reduce((s, r) => s + r.wins, 0);
+    const mostFailed = [...rows].sort((a, b) => b.failures - a.failures)[0];
+    const ev = d.events;
+    return {
+      sessions: d.sessions,
+      levelsAttempted: rows.filter((r) => r.attempts > 0).length,
+      levelsCompleted: rows.filter((r) => r.wins > 0).length,
+      totalAttempts,
+      completionRate: totalAttempts ? Math.round((totalWins / totalAttempts) * 100) : 0,
+      avgAttempts: rows.length ? +(totalAttempts / rows.length).toFixed(1) : 0,
+      mostFailedLevel: mostFailed && mostFailed.failures > 0 ? mostFailed.level : null,
+      invalidInputs: ev.invalid_action_feedback ?? 0,
+      hintOffered: ev.smart_hint_offered ?? 0,
+      hintUsed: ev.smart_hint_used ?? 0,
+      highestCombo: d.largestCombo,
+      sanctuaryVisits: d.sanctuaryVisits,
+      bookVisits: ev.piggy_book_opened ?? 0,
+      pigCardViews: ev.pig_card_opened ?? 0,
+      rescues: d.pigsFreed,
+      questsClaimed: ev.pig_personal_quest_reward_claimed ?? 0,
+      heartMoments: ev.heart_moment_triggered ?? 0,
+      nearWins: ev.near_win_entered ?? 0,
+      rows,
+    };
   }
 
   snapshot(): TelemetryData {

@@ -6,11 +6,13 @@ import {
   loadSave,
   persist,
   resetSave,
+  wasRecovered,
   type LevelReward,
   type RewardSummary,
   type SaveData,
 } from './save/save';
 import { telemetry } from './telemetry/telemetry';
+import { isPlaytest, perf, promptAnswered } from './playtest/playtest';
 import { generateDailyLevel, todayKey } from './daily/daily';
 import type { PiggyType } from './engine/types';
 import { MainMenu } from './components/screens/MainMenu';
@@ -22,6 +24,8 @@ import { KingdomScreen } from './components/kingdom/KingdomScreen';
 import { SanctuaryScreen } from './components/sanctuary/SanctuaryScreen';
 import { GameScreen } from './components/game/GameScreen';
 import { RescueScreen } from './components/screens/RescueScreen';
+import { PlaytestScreen } from './components/playtest/PlaytestScreen';
+import { QuickPrompt, PROMPTS, type PromptDef } from './components/playtest/QuickPrompt';
 
 export type Screen =
   | { name: 'menu' }
@@ -33,7 +37,8 @@ export type Screen =
   | { name: 'sanctuary' }
   | { name: 'rescue'; piggy: PiggyType }
   | { name: 'game'; levelId: number; runId?: number }
-  | { name: 'daily'; runId?: number };
+  | { name: 'daily'; runId?: number }
+  | { name: 'playtest' };
 
 export function App() {
   const initial = useRef<SaveData>(loadSave()).current;
@@ -44,12 +49,34 @@ export function App() {
     initial.story.introSeen ? { name: 'menu' } : { name: 'intro' },
   );
   const [toast, setToast] = useState<string | null>(null);
+  const [prompt, setPrompt] = useState<PromptDef | null>(null);
+  const playtest = isPlaytest();
   const pendingRescue = useRef<PiggyType | null>(null);
 
-  // One local session record per app load (no external tracking).
+  // One local session record per app load (no external tracking); start the
+  // (playtest-only) perf sampler; recover gracefully from a corrupt save.
   useEffect(() => {
-    telemetry.session();
+    telemetry.session({
+      reducedMotion: initial.settings.reducedMotion,
+      lowEffects: initial.settings.lowEffects,
+      sound: !initial.settings.muted,
+    });
+    if (playtest) perf.start();
+    if (wasRecovered()) {
+      window.setTimeout(
+        () => showToast('Recovered your progress from a backup 🐷'),
+        400,
+      );
+    }
+    return () => perf.stop();
+    // eslint-disable-next-line react-hooks/exhaustive-deps
   }, []);
+
+  // Show a one-tap playtest question, once each, without blocking play.
+  const maybePrompt = useCallback((id: string) => {
+    if (!playtest || promptAnswered(id) || !PROMPTS[id]) return;
+    setPrompt(PROMPTS[id]);
+  }, [playtest]);
 
   // Apply persisted settings to audio, haptics + motion.
   useEffect(() => {
@@ -73,8 +100,10 @@ export function App() {
 
   const go = useCallback((s: Screen) => {
     audio.resume();
+    telemetry.screen(s.name);
+    if (s.name === 'sanctuary') maybePrompt('sanctuary_return');
     setScreen(s);
-  }, []);
+  }, [maybePrompt]);
 
   // Finish the opening cinematic: mark it seen (once) and drop to the menu.
   const finishIntro = useCallback(() => {
@@ -98,9 +127,12 @@ export function App() {
         pendingRescue.current = hero;
         telemetry.rescue(hero);
       }
+      // Playtest one-tap check-ins at comprehension milestones.
+      if (wasFirstClear && reward.levelId === 1) maybePrompt('understand_l1');
+      if (wasFirstClear && reward.levelId === 5) maybePrompt('keep_playing');
       return summary;
     },
-    [save, update],
+    [save, update, maybePrompt],
   );
 
   // Daily bonus: generated fresh each day, validated by the solver.
@@ -234,6 +266,7 @@ export function App() {
           onSanctuary={() => go({ name: 'sanctuary' })}
           onUpdateSave={update}
           onToast={showToast}
+          onLoss={() => maybePrompt('clear_loss')}
         />
       )}
 
@@ -267,7 +300,7 @@ export function App() {
       )}
 
       {screen.name === 'rescue' && (
-        <RescueScreen piggy={screen.piggy} onDone={() => go({ name: 'kingdom' })} />
+        <RescueScreen piggy={screen.piggy} onDone={() => { maybePrompt('rescue_reward'); go({ name: 'kingdom' }); }} />
       )}
 
       {screen.name === 'settings' && (
@@ -281,8 +314,29 @@ export function App() {
             showToast('Progress reset');
           }}
           onToast={showToast}
+          onPlaytest={() => go({ name: 'playtest' })}
         />
       )}
+
+      {screen.name === 'playtest' && (
+        <PlaytestScreen
+          save={save}
+          onBack={() => go({ name: 'menu' })}
+          onUpdate={update}
+          onToast={showToast}
+          onSkipLevel={(id) => go({ name: 'game', levelId: id })}
+        />
+      )}
+
+      {/* Unobtrusive playtest badge (never shown to ordinary players) */}
+      {playtest && screen.name !== 'playtest' && screen.name !== 'game' && screen.name !== 'daily' && (
+        <button className="playtest-badge playtest-badge--fab" onClick={() => go({ name: 'playtest' })}>
+          PLAYTEST
+        </button>
+      )}
+
+      {/* One-tap playtest question (dismissible, once each) */}
+      {prompt && <QuickPrompt prompt={prompt} onClose={() => setPrompt(null)} />}
 
       {toast && <div className="toast">{toast}</div>}
     </div>

@@ -18,6 +18,9 @@ page.on('pageerror', (e) => consoleErrors.push('pageerror: ' + e.message));
 
 await page.goto('http://localhost:5173/', { waitUntil: 'networkidle' });
 await page.evaluate(() => localStorage.clear());
+// Dev builds enable Playtest Mode; pre-answer the one-tap check-ins so their
+// (bottom-anchored) overlay never intercepts automated level-select clicks.
+await page.evaluate(() => localStorage.setItem('pixel-piggies-prompts', JSON.stringify({ understand_l1: 1, clear_loss: 1, rescue_reward: 1, sanctuary_return: 1, keep_playing: 1 })));
 await page.reload({ waitUntil: 'networkidle' });
 // A fresh save opens on the story cinematic — skip it to reach the menu.
 const introSkip = page.locator('.cine-skip');

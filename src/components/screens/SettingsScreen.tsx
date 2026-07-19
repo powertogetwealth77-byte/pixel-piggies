@@ -5,6 +5,9 @@ import { LEVELS } from '../../data/levels';
 import { ITEMS, ITEM_ORDER } from '../../data/items';
 import { solveAll, type SolveReport } from '../../engine/solver';
 import { telemetry } from '../../telemetry/telemetry';
+import { isPlaytest } from '../../playtest/playtest';
+import { versionLabel } from '../../version';
+import { SaveManager } from '../playtest/SaveManager';
 
 interface Props {
   save: SaveData;
@@ -12,9 +15,10 @@ interface Props {
   onUpdate: (s: SaveData) => void;
   onReset: () => void;
   onToast: (msg: string) => void;
+  onPlaytest?: () => void;
 }
 
-export function SettingsScreen({ save, onBack, onUpdate, onReset, onToast }: Props) {
+export function SettingsScreen({ save, onBack, onUpdate, onReset, onToast, onPlaytest }: Props) {
   const [confirmReset, setConfirmReset] = useState(false);
   const [reports, setReports] = useState<SolveReport[] | null>(null);
 
@@ -155,6 +159,14 @@ export function SettingsScreen({ save, onBack, onUpdate, onReset, onToast }: Pro
         </div>
       </div>
 
+      <SaveManager save={save} onUpdate={onUpdate} onToast={onToast} />
+
+      {isPlaytest() && onPlaytest && (
+        <button className="btn btn--ghost btn--block" onClick={onPlaytest}>
+          🧪 Playtest dashboard
+        </button>
+      )}
+
       <PlaytestStats onToast={onToast} />
 
       <div className="dev-row">
@@ -174,6 +186,8 @@ export function SettingsScreen({ save, onBack, onUpdate, onReset, onToast }: Pro
 
       <p style={{ textAlign: 'center', opacity: 0.6, fontSize: '0.8rem' }}>
         Pixel Piggies — original game. Art, sound &amp; code made from scratch.
+        <br />
+        <span style={{ opacity: 0.7, fontSize: '0.72rem' }}>{versionLabel()}</span>
       </p>
     </div>
   );

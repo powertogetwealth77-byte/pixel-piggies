@@ -29,6 +29,7 @@ interface Props {
   onSanctuary: () => void;
   onUpdateSave: (s: SaveData) => void;
   onToast: (msg: string) => void;
+  onLoss?: () => void;
 }
 
 const STAGE_NUM: Record<string, number> = { calm: 1, building: 2, critical: 3 };
@@ -65,7 +66,7 @@ const failCounts = new Map<number, number>();
 
 export type PenMood = 'idle' | 'sad' | 'happy' | 'wow';
 
-export function GameScreen({ level, save, onComplete, onExit, onQuit, onRestart, onKingdom, onSanctuary, onUpdateSave, onToast }: Props) {
+export function GameScreen({ level, save, onComplete, onExit, onQuit, onRestart, onKingdom, onSanctuary, onUpdateSave, onToast, onLoss }: Props) {
   const fxMode = save.settings.reducedMotion ? 'off' : save.settings.lowEffects ? 'reduced' : 'full';
   const { engine, snapshot: snap } = useEngine(level);
   const [shakeClass, setShakeClass] = useState('');
@@ -327,6 +328,7 @@ export function GameScreen({ level, save, onComplete, onExit, onQuit, onRestart,
       failCounts.set(level.id, (failCounts.get(level.id) ?? 0) + 1);
       telemetry.levelEnd(level.id, false, snap.elapsedMs, snap.bestCombo);
       telemetry.log('level_failure_reason');
+      onLoss?.();
       if (snap.lossReason === 'tide') telemetry.timeoutLoss();
       setResult({
         won: false,
