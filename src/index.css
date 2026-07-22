@@ -197,6 +197,19 @@ button {
 }
 
 /* ---------- Main menu ---------- */
+.menu-hero-art {
+  width: 100%;
+  max-width: 320px;
+  margin: 0 auto;
+  border-radius: 20px;
+  overflow: hidden;
+  box-shadow: var(--shadow);
+}
+.menu-hero-art img {
+  display: block;
+  width: 100%;
+  height: auto;
+}
 .menu-hero {
   display: flex;
   flex-direction: column;
@@ -302,6 +315,9 @@ button {
   display: flex;
   flex-direction: column;
   overflow: hidden;
+  background-image: linear-gradient(180deg, rgba(20, 10, 40, 0.55), rgba(20, 10, 40, 0.75)), var(--game-bg-image);
+  background-size: cover;
+  background-position: center;
 }
 .game.shake {
   animation: shake 0.32s ease;

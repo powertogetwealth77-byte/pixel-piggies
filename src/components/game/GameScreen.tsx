@@ -7,6 +7,7 @@ import { PICTURE_CHAR } from '../../data/palette';
 import { Board } from './Board';
 import { Pens } from './Pens';
 import { Stars } from '../ui/Stars';
+import gameplayBg from '../../../assets/ui/bloom_garden_gameplay_bg.webp';
 
 interface Props {
   level: LevelDef;
@@ -145,7 +146,10 @@ export function GameScreen({ level, onComplete, onExit, onQuit, onToast }: Props
   const toggleMute = () => setMuted(audio.toggleMute());
 
   return (
-    <div className={`game ${shakeClass}`}>
+    <div
+      className={`game ${shakeClass}`}
+      style={{ ['--game-bg-image' as string]: `url(${gameplayBg})` }}
+    >
       {/* HUD */}
       <div className="hud">
         <div className="hud-top">

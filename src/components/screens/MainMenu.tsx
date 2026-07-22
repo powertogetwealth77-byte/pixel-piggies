@@ -1,6 +1,7 @@
 import type { SaveData } from '../../save/save';
 import { totalStars } from '../../save/save';
 import { PiggyAvatar } from '../ui/PiggyAvatar';
+import heroArt from '../../../assets/brand/launch_hero.webp';
 
 interface Props {
   save: SaveData;
@@ -14,6 +15,10 @@ export function MainMenu({ save, onPlay, onKingdom, onSettings }: Props) {
   const stars = totalStars(save);
   return (
     <div className="screen">
+      <div className="menu-hero-art">
+        <img src={heroArt} alt="Pixel Piggies" />
+      </div>
+
       <div className="menu-hero">
         <h1 className="title">Pixel Piggies</h1>
         <p className="subtitle">Launch, match &amp; reveal!</p>
