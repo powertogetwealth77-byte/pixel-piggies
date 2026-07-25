@@ -166,10 +166,21 @@ class AudioManager {
     if (tier >= 2) this.noise(0.2, 0.14);
   }
 
-  /** Happy piggy squeal (poking a rescued piggy in the Kingdom). */
-  squeal() {
-    this.tone(620, 0.1, 'square', 0.16, 0, 1150);
-    this.tone(880, 0.14, 'triangle', 0.18, 0.07, 1400);
+  /**
+   * Happy piggy squeal (poking a rescued piggy in the Kingdom). Each hero
+   * type gets its own register so the four rescues feel like distinct
+   * characters rather than one generic sound.
+   */
+  squeal(hero?: 'pip' | 'mochi' | 'blaze' | 'prism') {
+    const voice: Record<string, [number, number]> = {
+      pip: [620, 880], // bright, chipper
+      mochi: [520, 740], // soft, round
+      blaze: [700, 980], // punchy, eager
+      prism: [780, 1180], // sparkly, high
+    };
+    const [a, b] = voice[hero ?? 'pip'];
+    this.tone(a, 0.1, 'square', 0.16, 0, a * 1.85);
+    this.tone(b, 0.14, 'triangle', 0.18, 0.07, b * 1.6);
   }
 
   /** Cascade stage jingle — rises a major third per stage. */
@@ -196,6 +207,31 @@ class AudioManager {
   tideWarn() {
     this.tone(370, 0.18, 'triangle', 0.16, 0, 300);
     this.tone(555, 0.2, 'sine', 0.1, 0.06);
+  }
+
+  /**
+   * A gentle low heartbeat pulse played on a loop while the Tide is
+   * Critical. Purely a pressure cue — it never changes odds or timers,
+   * just gives the ear a readable "hurry" signal alongside the music.
+   */
+  criticalPulse() {
+    this.tone(96, 0.09, 'sine', 0.14, 0);
+    this.tone(96, 0.09, 'sine', 0.11, 0.14);
+  }
+
+  /**
+   * A warm "welcome back" twinkle for an instant piggy recall — a chain
+   * pulling a hero back, the Whistle item, or Fever recalling the team.
+   * Distinct from the pop/praise family so a recall always reads as its
+   * own rewarding event, not just another spawn.
+   */
+  recallChime(big = false) {
+    this.tone(784, 0.12, 'triangle', 0.2, 0, 1046);
+    this.tone(1046, 0.16, 'sine', 0.16, 0.06, 1568);
+    if (big) {
+      this.tone(1318, 0.2, 'triangle', 0.14, 0.12);
+      this.noise(0.12, 0.08);
+    }
   }
 
   /** A Glitch Strike — a detuned wobble, tense but not harsh. */

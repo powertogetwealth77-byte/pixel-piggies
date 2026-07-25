@@ -41,6 +41,10 @@ export interface TelemetryData {
   postLossExits: number;
   sanctuaryVisits: number;
   pigsFreed: number;
+  /** Cumulative ms shaved off piggy return cooldowns by good play (active recovery loop). */
+  cooldownSavedMs: number;
+  /** Instant piggy recalls by source: chains, the Whistle item, Fever, Second Wind. */
+  recalls: Partial<Record<'chain' | 'whistle' | 'fever' | 'secondWind', number>>;
   /** Lightweight internal event counters (world map, replay economy, etc.). */
   events: Partial<Record<string, number>>;
   /** Anonymous, locally-generated id — no personal data, never sent anywhere. */
@@ -110,6 +114,8 @@ function blank(): TelemetryData {
     postLossExits: 0,
     sanctuaryVisits: 0,
     pigsFreed: 0,
+    cooldownSavedMs: 0,
+    recalls: {},
     events: {},
     anonId: genId(),
     context: { device: 'desktop', viewport: '', browser: 'Other', reducedMotion: false, lowEffects: false, sound: true, startedAt: new Date().toISOString() },
@@ -299,6 +305,18 @@ class Telemetry {
 
   itemUse(id: string) {
     this.data.itemUses[id] = (this.data.itemUses[id] ?? 0) + 1;
+    this.persist();
+  }
+
+  /** Cumulative ms shaved off piggy return cooldowns by good play, this run. */
+  cooldownSaved(ms: number) {
+    this.data.cooldownSavedMs += ms;
+    this.persist();
+  }
+
+  /** An instant piggy recall fired (chain / whistle / fever / secondWind). */
+  recall(source: 'chain' | 'whistle' | 'fever' | 'secondWind', count = 1) {
+    this.data.recalls[source] = (this.data.recalls[source] ?? 0) + count;
     this.persist();
   }
 

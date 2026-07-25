@@ -92,6 +92,13 @@ export interface ChainEvent {
   multiplier: number;
 }
 
+/** An instant piggy recall (chain, Whistle item, or Fever recalling the team). */
+export interface RecallEvent {
+  id: number;
+  source: 'chain' | 'whistle' | 'fever' | 'secondWind';
+  slots: number[];
+}
+
 export interface GameSnapshot {
   phase: GamePhase;
   level: LevelDef;
@@ -116,6 +123,7 @@ export interface GameSnapshot {
   nextSpawnMs: number;
   lastLaunch: LaunchResult | null;
   lastChain: ChainEvent | null;
+  lastRecall: RecallEvent | null;
   /** True while a cascade stage is scheduled (blocks may still auto-pop). */
   chainPending: boolean;
   elapsedMs: number;
@@ -129,6 +137,7 @@ export interface GameSnapshot {
   strikes: number; // Glitch Strikes taken (3 = loss)
   maxStrikes: number;
   lastStrikeId: number; // increments each strike (UI trigger)
+  cooldownSavedMs: number; // cumulative ms shaved off return cooldown by good play
   relaxed: boolean;
   /** Per-pen recharge progress 0..1 (1 = ready / occupied), for recharge rings. */
   penRecharge: number[];

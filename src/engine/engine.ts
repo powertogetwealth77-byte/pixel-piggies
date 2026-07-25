@@ -1,6 +1,7 @@
 import type {
   Block,
   ChainEvent,
+  ColorId,
   GameSnapshot,
   ItemId,
   LaunchResult,
@@ -8,6 +9,7 @@ import type {
   LossReason,
   Piggy,
   QueueEntry,
+  RecallEvent,
 } from './types';
 import { BLOCK_CHAR } from '../data/palette';
 import {
@@ -39,6 +41,7 @@ const CHAIN_RECALL_MIN = 3;
 
 let uid = 1;
 const nextId = () => uid++;
+let recallUid = 1;
 
 export function expandQueue(entries: QueueEntry[]): Piggy[] {
   const out: Piggy[] = [];
@@ -90,6 +93,7 @@ interface InternalState {
   lastLaunch: LaunchResult | null;
   lossReason: LossReason | null;
   lastChain: ChainEvent | null;
+  lastRecall: RecallEvent | null;
   /** Scheduled cascade check: cluster ids per block before the last pop. */
   pendingChain: { stage: number; delayMs: number; prevClusterOf: Map<number, number> } | null;
   // --- The Glitch Tide ---
@@ -98,6 +102,8 @@ interface InternalState {
   tideFreezeMs: number; // remaining freeze (chain / freeze pop / grace)
   lastStrikeId: number;
   lastTimeRestored: number;
+  /** Cumulative ms shaved off the piggy return cooldown by good play (telemetry). */
+  cooldownSavedMs: number;
 }
 
 export interface EngineOptions {
@@ -144,12 +150,14 @@ export class GameEngine {
       lastLaunch: null,
       lossReason: null,
       lastChain: null,
+      lastRecall: null,
       pendingChain: null,
       tide: 0,
       strikes: 0,
       tideFreezeMs: 0,
       lastStrikeId: 0,
       lastTimeRestored: 0,
+      cooldownSavedMs: 0,
     };
     this.snap = this.build();
   }
@@ -205,6 +213,7 @@ export class GameEngine {
       nextSpawnMs: Math.max(0, s.spawnTimer),
       lastLaunch: s.lastLaunch,
       lastChain: s.lastChain,
+      lastRecall: s.lastRecall,
       chainPending: s.pendingChain !== null,
       elapsedMs: s.elapsedMs,
       // "Close call" now means running LOW on piggies (no overflow any more).
@@ -217,6 +226,7 @@ export class GameEngine {
       strikes: s.strikes,
       maxStrikes: MAX_STRIKES,
       lastStrikeId: s.lastStrikeId,
+      cooldownSavedMs: s.cooldownSavedMs,
       relaxed: this.relaxed,
       penRecharge: this.penRecharge(),
       lastTimeRestored: s.lastTimeRestored,
@@ -415,27 +425,35 @@ export class GameEngine {
   /** Active recovery: shorten the piggy return cooldown after a match. */
   private shortenCooldown(clearedCount: number) {
     const cut = Math.min(COOLDOWN_REDUCE_CAP, clearedCount * COOLDOWN_REDUCE_PER_CLEAR);
+    const applied = Math.min(cut, this.s.spawnTimer);
     this.s.spawnTimer = Math.max(0, this.s.spawnTimer - cut);
+    this.s.cooldownSavedMs += applied;
   }
 
   /** Recall one piggy immediately if there's an empty pen (chains trigger this). */
-  private recallOne(): boolean {
+  private recallOne(source: RecallEvent['source'] = 'chain'): boolean {
     const s = this.s;
     if (s.queue.length === 0) return false;
     const empty = s.pens.findIndex((p) => p === null);
     if (empty === -1) return false;
     s.pens[empty] = s.queue.shift()!;
     s.spawnTimer = FAST_REFILL_MS;
+    s.lastRecall = { id: ++recallUid, source, slots: [empty] };
     return true;
   }
 
   /** Recall the whole team into every empty pen (Fever trigger). */
-  private recallTeam() {
+  private recallTeam(source: RecallEvent['source'] = 'fever') {
     const s = this.s;
+    const slots: number[] = [];
     for (let slot = 0; slot < s.pens.length; slot++) {
-      if (s.pens[slot] == null && s.queue.length > 0) s.pens[slot] = s.queue.shift()!;
+      if (s.pens[slot] == null && s.queue.length > 0) {
+        s.pens[slot] = s.queue.shift()!;
+        slots.push(slot);
+      }
     }
     s.spawnTimer = FAST_REFILL_MS;
+    if (slots.length > 0) s.lastRecall = { id: ++recallUid, source, slots };
   }
 
   /**
@@ -460,7 +478,7 @@ export class GameEngine {
         this.emit();
         return true;
       case 'piggyWhistle': {
-        const ok = this.recallOne();
+        const ok = this.recallOne('whistle');
         if (ok) this.emit();
         return ok;
       }
@@ -478,17 +496,50 @@ export class GameEngine {
     }
   }
 
-  /** Post-loss continue: revive with strikes wound back and the Tide calmed. */
+  /**
+   * Post-loss continue. Fair by construction: it only ever relieves the
+   * pressure the player just ran out of (Tide meter or piggy supply) — it
+   * never touches the board, clears blocks for you, or changes odds. Every
+   * level stays beatable with zero coins; this only offers a second try.
+   */
   secondWind(): boolean {
     const s = this.s;
-    if (s.phase !== 'lost' || s.lossReason !== 'tide') return false;
-    s.phase = 'playing';
-    s.lossReason = null;
-    s.strikes = Math.max(0, s.strikes - 2); // give back two strikes
-    s.tide = 20;
-    s.tideFreezeMs = 1500;
-    this.emit();
-    return true;
+    if (s.phase !== 'lost') return false;
+    if (s.lossReason === 'tide') {
+      s.phase = 'playing';
+      s.lossReason = null;
+      s.strikes = Math.max(0, s.strikes - 2); // give back two strikes
+      s.tide = 20;
+      s.tideFreezeMs = 1500;
+      this.emit();
+      return true;
+    }
+    if (s.lossReason === 'ammo') {
+      // Ran out of piggies with blocks still standing: send in reinforcements
+      // colour-matched to what's left on the board, so they're always useful
+      // and never trivialize the puzzle.
+      const colors = new Set<ColorId>();
+      for (const row of s.board) for (const b of row) if (b) colors.add(b.color);
+      if (colors.size === 0) return false;
+      const palette = Array.from(colors);
+      const reinforcements: Piggy[] = [];
+      for (let i = 0; i < 4; i++) {
+        reinforcements.push({
+          id: nextId(),
+          type: 'pip',
+          color: palette[i % palette.length],
+          ammo: 1,
+          maxAmmo: 1,
+        });
+      }
+      s.queue.push(...reinforcements);
+      s.phase = 'playing';
+      s.lossReason = null;
+      this.recallTeam('secondWind');
+      this.emit();
+      return true;
+    }
+    return false;
   }
 
   /** Launch the selected (or given) piggy into a lane. */

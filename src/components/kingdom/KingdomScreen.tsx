@@ -200,7 +200,7 @@ export function KingdomScreen({ save, onBack, onUpdate, onToast }: Props) {
 
   const poke = (w: Wanderer) => {
     setReacting(w.name);
-    audio.squeal();
+    audio.squeal(w.type);
     window.setTimeout(() => setReacting((r) => (r === w.name ? null : r)), 700);
   };
 

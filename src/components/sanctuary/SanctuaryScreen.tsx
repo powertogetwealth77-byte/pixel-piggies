@@ -117,7 +117,7 @@ export function SanctuaryScreen({ save, onBack, onBook, onUpdate, onToast }: Pro
     telemetry.log('pig_rescue_started');
     onUpdate(nextSave);
     telemetry.pigFreed();
-    audio.squeal();
+    audio.squeal(pig.type);
     setRevealId(pig.id); // the character reveal handles its own sounds
   };
 

@@ -26,7 +26,7 @@ export function RescueScreen({ piggy, onDone }: Props) {
     }, 1100);
     const t2 = window.setTimeout(() => {
       audio.win();
-      audio.squeal();
+      audio.squeal(piggy);
       setStep(2);
     }, 2100);
     return () => {

@@ -170,6 +170,30 @@ export function GameScreen({ level, save, onComplete, onExit, onQuit, onRestart,
     prevStage.current = snap.tideStage;
   }, [snap.tideStage, snap.tideEnabled, snap.feverActive]);
 
+  // Critical-pressure heartbeat: a soft pulse loop while the Tide is
+  // Critical, layered on top of the music so urgency is always readable by
+  // ear, not just by the meter. Stops the instant Fever or a calmer stage
+  // takes over — never runs during Fever's celebration.
+  useEffect(() => {
+    if (!snap.tideEnabled || snap.tideStage !== 'critical' || snap.feverActive) return;
+    audio.criticalPulse();
+    const id = window.setInterval(() => audio.criticalPulse(), 1100);
+    return () => window.clearInterval(id);
+  }, [snap.tideEnabled, snap.tideStage, snap.feverActive]);
+
+  // Instant piggy recall (chain, Whistle, Fever team, or Second Wind
+  // reinforcements): a warm chime + haptic + telemetry, so a recall always
+  // reads as its own rewarding moment instead of blending into normal spawns.
+  const lastRecallId = useRef(-1);
+  useEffect(() => {
+    const r = snap.lastRecall;
+    if (!r || r.id === lastRecallId.current) return;
+    lastRecallId.current = r.id;
+    audio.recallChime(r.slots.length > 1);
+    vibrate(r.slots.length > 1 ? [20, 30, 20] : 18);
+    telemetry.recall(r.source, r.slots.length);
+  }, [snap.lastRecall]);
+
   // Glitch Strike feedback: glitch flash, wobble SFX, haptic, telemetry.
   const lastStrike = useRef(0);
   useEffect(() => {
@@ -319,6 +343,7 @@ export function GameScreen({ level, save, onComplete, onExit, onQuit, onRestart,
       if (summary.newStarTokens > 0) window.setTimeout(() => audio.starPing(), 620);
       if (summary.treasureCoins > 0) window.setTimeout(() => audio.chestOpen(), 800);
       telemetry.levelEnd(level.id, true, snap.elapsedMs, snap.bestCombo);
+      if (snap.cooldownSavedMs > 0) telemetry.cooldownSaved(snap.cooldownSavedMs);
       if (level.id === 1) telemetry.tutorialDone();
       setResult({ won: true, reward, summary });
     } else if (snap.phase === 'lost') {
@@ -327,6 +352,7 @@ export function GameScreen({ level, save, onComplete, onExit, onQuit, onRestart,
       vibrate(200);
       failCounts.set(level.id, (failCounts.get(level.id) ?? 0) + 1);
       telemetry.levelEnd(level.id, false, snap.elapsedMs, snap.bestCombo);
+      if (snap.cooldownSavedMs > 0) telemetry.cooldownSaved(snap.cooldownSavedMs);
       telemetry.log('level_failure_reason');
       onLoss?.();
       if (snap.lossReason === 'tide') telemetry.timeoutLoss();
@@ -670,7 +696,7 @@ export function GameScreen({ level, save, onComplete, onExit, onQuit, onRestart,
             onSanctuary();
           }}
           continueOffer={
-            !result.won && result.lossReason === 'tide'
+            !result.won && (result.lossReason === 'tide' || result.lossReason === 'ammo')
               ? {
                   cost: itemAvailable(save, 'secondWind') > 0 ? 0 : ITEMS.secondWind.price,
                   affordable:
